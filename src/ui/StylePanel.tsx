@@ -13,7 +13,7 @@ import { inferPropDescriptors, type PropDescriptor } from "../lib/propsInference
 import { ElementInspector } from "./ElementInspector";
 import type { SelectedElement } from "./ComponentPreview";
 
-type Tab = "element" | "props" | "tokens" | "code";
+export type Tab = "props" | "tokens" | "code" | "element";
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 interface Props {
@@ -26,6 +26,10 @@ interface Props {
   /** Path to the project's main CSS file (for the Tokens tab "Save" button).
    *  Defaults to `"src/index.css"`. */
   tokensCssFile?: string;
+  /** Active tab. Lifted to DevWorkshopPage so ComponentPreview can react to
+   *  `tab === "element"` and switch into inspect mode. */
+  tab: Tab;
+  onTabChange: (next: Tab) => void;
 }
 
 export function StylePanel({
@@ -36,31 +40,31 @@ export function StylePanel({
   selectedElement,
   onDeselectElement,
   tokensCssFile = "src/index.css",
+  tab,
+  onTabChange,
 }: Props) {
-  const [tab, setTab] = useState<Tab>("props");
-
-  useEffect(() => {
-    if (selectedElement) setTab("element");
-    else if (tab === "element") setTab("props");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedElement]);
-
   return (
-    <aside style={{ display: "flex", height: "100%", minWidth: 0, flex: 1, flexDirection: "column", borderLeft: "1px solid #e5e5e5", background: "white", color: "#101114" }}>
-      <div style={{ display: "flex", borderBottom: "1px solid #e5e5e5" }}>
-        {selectedElement && <TabButton active={tab === "element"} onClick={() => setTab("element")}>Element</TabButton>}
-        <TabButton active={tab === "props"} onClick={() => setTab("props")}>Props</TabButton>
-        <TabButton active={tab === "tokens"} onClick={() => setTab("tokens")}>Tokens</TabButton>
-        <TabButton active={tab === "code"} onClick={() => setTab("code")}>Code</TabButton>
+    <aside className="dw-card" style={{ display: "flex", height: "100%", minWidth: 0, flex: 1, flexDirection: "column", color: "#101114" }}>
+      <div style={{ padding: 10, borderBottom: "1px solid #f1f1f1" }}>
+        <div className="dw-segments" role="tablist">
+          <button className="dw-segment" role="tab" data-active={tab === "props" ? "true" : "false"} onClick={() => onTabChange("props")}>Props</button>
+          <button className="dw-segment" role="tab" data-active={tab === "tokens" ? "true" : "false"} onClick={() => onTabChange("tokens")}>Tokens</button>
+          <button className="dw-segment" role="tab" data-active={tab === "code" ? "true" : "false"} onClick={() => onTabChange("code")}>Code</button>
+          <button className="dw-segment" role="tab" data-active={tab === "element" ? "true" : "false"} onClick={() => onTabChange("element")}>Element</button>
+        </div>
       </div>
 
-      {tab === "element" && selectedElement && (
-        <ElementInspector
-          key={`${selectedElement.source?.file}:${selectedElement.source?.line}:${selectedElement.source?.column}`}
-          element={selectedElement.element}
-          source={selectedElement.source}
-          onDeselect={onDeselectElement}
-        />
+      {tab === "element" && (
+        selectedElement ? (
+          <ElementInspector
+            key={`${selectedElement.source?.file}:${selectedElement.source?.line}:${selectedElement.source?.column}`}
+            element={selectedElement.element}
+            source={selectedElement.source}
+            onDeselect={onDeselectElement}
+          />
+        ) : (
+          <ElementEmptyState />
+        )
       )}
       {tab === "props" && (
         <PropsTab entry={entry} variantIndex={variantIndex} argsOverride={argsOverride} onArgsOverrideChange={onArgsOverrideChange} />
@@ -71,11 +75,18 @@ export function StylePanel({
   );
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function ElementEmptyState() {
   return (
-    <button onClick={onClick} className="dw-tab" data-active={active ? "true" : "false"}>
-      {children}
-    </button>
+    <div style={{ display: "flex", flex: 1, flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", gap: 10 }}>
+      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+        <rect x="4" y="4" width="20" height="20" rx="3" stroke="#b3b3b3" strokeWidth="1.5" strokeDasharray="3 3" />
+        <path d="M22 22 L32 28 L26 30 L28 36 L24 32 L22 38 Z" fill="#101114" stroke="white" strokeWidth="1" strokeLinejoin="round" />
+      </svg>
+      <div style={{ fontSize: 13, color: "#101114", fontWeight: 600 }}>Click any element on the canvas</div>
+      <div style={{ fontSize: 11, color: "#808080", lineHeight: 1.5, maxWidth: 220 }}>
+        No modifier keys needed while you're on this tab. Hold <kbd className="dw-kbd">⌥</kbd> to also see spacing.
+      </div>
+    </div>
   );
 }
 

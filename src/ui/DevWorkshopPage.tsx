@@ -67,6 +67,33 @@ const STYLES = `
   font-size: 10px;
 }
 
+/* Floating card surface: panels sit on the gray workspace with a subtle
+   shadow so they read as discrete cards. */
+[data-dev-workshop] .dw-card {
+  background: var(--dw-bg);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
+  overflow: hidden;
+}
+
+/* Counter badge (e.g. total components in sidebar header) */
+[data-dev-workshop] .dw-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--dw-bg-input);
+  border-radius: 999px;
+  padding: 3px 8px 3px 6px;
+  font-family: var(--dw-font-mono);
+  font-size: 11px;
+  color: var(--dw-text-muted);
+  line-height: 1.2;
+}
+[data-dev-workshop] .dw-badge svg {
+  flex-shrink: 0;
+  display: block;
+}
+
 /* Each chrome class is self-contained: includes its own font-family, border:none,
    background, padding, etc. so we don't rely on global resets that would leak
    into the user's components rendered inside the canvas. */
@@ -190,33 +217,114 @@ const STYLES = `
 [data-dev-workshop] .dw-tab:hover { background: var(--dw-bg-soft); color: var(--dw-text); }
 [data-dev-workshop] .dw-tab[data-active="true"] { background: var(--dw-bg-input); color: var(--dw-text); }
 
-[data-dev-workshop] .dw-sidebar-item {
+/* Sidebar row: container that holds icon-btn (toggle expand) + name-btn (select) */
+[data-dev-workshop] .dw-sidebar-row {
+  display: flex;
+  align-items: stretch;
+  border-radius: 8px;
+  transition: background 80ms;
+}
+[data-dev-workshop] .dw-sidebar-row:hover { background: var(--dw-bg-soft); }
+[data-dev-workshop] .dw-sidebar-row[data-active="true"] {
+  background: var(--dw-bg-input);
+}
+[data-dev-workshop] .dw-sidebar-icon-btn {
   appearance: none;
-  box-sizing: border-box;
   cursor: pointer;
   border: none;
   margin: 0;
   background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  flex-shrink: 0;
+  color: var(--dw-text-placeholder);
+  border-radius: 8px 0 0 8px;
+}
+[data-dev-workshop] .dw-sidebar-icon-btn:hover { color: var(--dw-text-muted); }
+[data-dev-workshop] .dw-sidebar-icon-spacer {
   display: block;
+  width: 24px;
+  flex-shrink: 0;
+}
+[data-dev-workshop] .dw-sidebar-name-btn {
+  appearance: none;
+  cursor: pointer;
+  border: none;
+  margin: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex: 1;
-  padding: 6px 16px 6px 0;
+  min-width: 0;
+  padding: 7px 10px 7px 4px;
   text-align: left;
   font-family: var(--dw-font);
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.3;
   color: var(--dw-text-muted);
-  transition: background 80ms, color 80ms;
+  border-radius: 0 8px 8px 0;
+  transition: color 80ms;
 }
-[data-dev-workshop] .dw-sidebar-item:hover { background: var(--dw-bg-soft); color: var(--dw-text); }
-[data-dev-workshop] .dw-sidebar-item[data-active="true"] {
-  background: var(--dw-bg-input);
+[data-dev-workshop] .dw-sidebar-row[data-active="true"] .dw-sidebar-name-btn {
   color: var(--dw-text);
   font-weight: 500;
 }
-[data-dev-workshop] .dw-sidebar-item.dw-sidebar-item-variant {
+[data-dev-workshop] .dw-sidebar-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-dev-workshop] .dw-sidebar-count {
+  flex-shrink: 0;
+  font-family: var(--dw-font-mono);
+  font-size: 10px;
+  color: var(--dw-text-placeholder);
+}
+[data-dev-workshop] .dw-sidebar-row.dw-sidebar-row-variant .dw-sidebar-name-btn {
   font-size: 12px;
-  padding-left: 40px;
+  padding-left: 30px;
   color: var(--dw-text-subtle);
+  border-radius: 8px;
+}
+[data-dev-workshop] .dw-sidebar-row.dw-sidebar-row-variant {
+  border-radius: 8px;
+}
+
+/* Segmented control: tab switcher in StylePanel header */
+[data-dev-workshop] .dw-segments {
+  display: flex;
+  background: var(--dw-bg-input);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+[data-dev-workshop] .dw-segment {
+  appearance: none;
+  cursor: pointer;
+  border: none;
+  margin: 0;
+  flex: 1;
+  padding: 6px 8px;
+  font-family: var(--dw-font);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: center;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dw-text-muted);
+  transition: background 120ms, color 120ms, box-shadow 120ms;
+}
+[data-dev-workshop] .dw-segment:hover { color: var(--dw-text); }
+[data-dev-workshop] .dw-segment[data-active="true"] {
+  background: var(--dw-bg);
+  color: var(--dw-text);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
 }
 
 [data-dev-workshop] .dw-section-label {
@@ -261,20 +369,38 @@ const STYLES = `
 }
 [data-dev-workshop] .dw-ghost:hover { background: var(--dw-bg-input-hover); color: var(--dw-text); }
 
+/* Resize handle: invisible drag area between floating panels.
+   A subtle accent line shows on hover so the user discovers it. */
 [data-dev-workshop] .dw-resize {
   appearance: none;
   box-sizing: border-box;
   border: none;
   margin: 0;
   padding: 0;
-  width: 4px;
+  width: 12px;
   flex-shrink: 0;
   cursor: ew-resize;
-  background: var(--dw-border);
-  transition: background 120ms;
+  background: transparent;
   align-self: stretch;
+  position: relative;
 }
-[data-dev-workshop] .dw-resize:hover { background: var(--dw-accent); }
+[data-dev-workshop] .dw-resize::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 28px;
+  border-radius: 1px;
+  background: var(--dw-border);
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 120ms, background 120ms;
+}
+[data-dev-workshop] .dw-resize:hover::after {
+  opacity: 1;
+  background: var(--dw-accent);
+}
 `;
 
 export interface DevWorkshopPageProps {
@@ -283,12 +409,16 @@ export interface DevWorkshopPageProps {
   tokensCssFile?: string;
 }
 
+export type Tab = "props" | "tokens" | "code" | "element";
+
 export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: DevWorkshopPageProps) {
   const [selected, setSelected] = useState<ComponentEntry | null>(componentEntries[0] ?? null);
   const [variantIndex, setVariantIndex] = useState(0);
+  const [variantExplicit, setVariantExplicit] = useState(false);
   const [argsOverride, setArgsOverride] = useState<ArgsOverride>({});
   const [selectedEl, setSelectedEl] = useState<SelectedElement | null>(null);
   const [outlineHidden, setOutlineHidden] = useState(false);
+  const [tab, setTab] = useState<Tab>("props");
 
   const [sidebarWidth, setSidebarWidth] = useState(() => readLSNumber(LS_SIDEBAR, 240));
   const [panelWidth, setPanelWidth] = useState(() => readLSNumber(LS_PANEL, 360));
@@ -296,9 +426,10 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
   useEffect(() => localStorage.setItem(LS_SIDEBAR, String(sidebarWidth)), [sidebarWidth]);
   useEffect(() => localStorage.setItem(LS_PANEL, String(panelWidth)), [panelWidth]);
 
-  const handleSelect = useCallback((entry: ComponentEntry, variantIdx = 0) => {
+  const handleSelect = useCallback((entry: ComponentEntry, variantIdx: number | null = null) => {
     setSelected(entry);
-    setVariantIndex(variantIdx);
+    setVariantIndex(variantIdx ?? 0);
+    setVariantExplicit(variantIdx !== null);
     setArgsOverride({});
     setSelectedEl(null);
     setOutlineHidden(false);
@@ -306,10 +437,18 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
 
   const handleVariantChange = useCallback((i: number) => {
     setVariantIndex(i);
+    setVariantExplicit(true);
     setArgsOverride({});
     setSelectedEl(null);
     setOutlineHidden(false);
   }, []);
+
+  // Auto-switch to Element tab when something is selected via canvas click
+  useEffect(() => {
+    if (selectedEl) setTab("element");
+  }, [selectedEl]);
+
+  const inspectMode = tab === "element";
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -359,7 +498,7 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
     return (
       <>
         <style>{STYLES}</style>
-        <div data-dev-workshop style={{ position: "fixed", inset: 0, zIndex: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "white", color: "#101114" }}>
+        <div data-dev-workshop style={{ position: "fixed", inset: 0, zIndex: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#F4F4F4", color: "#101114" }}>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 18, fontWeight: 600 }}>No stories found</div>
             <div style={{ marginTop: 8, fontSize: 14, color: "#808080" }}>
@@ -374,11 +513,12 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
   return (
     <>
       <style>{STYLES}</style>
-      <div data-dev-workshop style={{ position: "fixed", inset: 0, zIndex: 0, display: "flex", background: "white", color: "#101114" }}>
+      <div data-dev-workshop style={{ position: "fixed", inset: 0, zIndex: 0, display: "flex", background: "#F4F4F4", color: "#101114", padding: 12, gap: 0 }}>
         <ComponentSidebar
           entries={componentEntries}
           selectedId={selected.id}
           variantIndex={variantIndex}
+          variantExplicit={variantExplicit}
           width={sidebarWidth}
           onSelect={handleSelect}
         />
@@ -392,6 +532,7 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
           selected={selectedEl}
           onSelectElement={setSelectedEl}
           hideSelectionOutline={outlineHidden}
+          inspectMode={inspectMode}
         />
         <button className="dw-resize" onMouseDown={startResize("panel")} title="Drag to resize" aria-label="resize panel" />
         <div style={{ width: panelWidth, display: "flex", height: "100%", flexShrink: 0 }}>
@@ -403,6 +544,8 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
             selectedElement={selectedEl}
             onDeselectElement={() => setSelectedEl(null)}
             tokensCssFile={tokensCssFile}
+            tab={tab}
+            onTabChange={setTab}
           />
         </div>
       </div>
