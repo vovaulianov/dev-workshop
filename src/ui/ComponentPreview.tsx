@@ -137,7 +137,7 @@ export function ComponentPreview({ entry, variantIndex, argsOverride, selected, 
             <div className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "#b3b3b3" }}>{entry.sourceFile}</div>
           </div>
           <div className="dw-mono" style={{ fontSize: 10, color: "#b3b3b3", flexShrink: 0 }}>
-            <kbd className="dw-kbd">⌘</kbd>+click or Element tab to select · <kbd className="dw-kbd">⌥</kbd> for spacing · <kbd className="dw-kbd">esc</kbd> hides outline
+            {" "}<kbd className="dw-kbd">⌘</kbd>+ click or Element tab to select · <kbd className="dw-kbd">⌥</kbd> for spacing · <kbd className="dw-kbd">esc</kbd> hides outline
           </div>
         </header>
 
