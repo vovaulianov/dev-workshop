@@ -1,0 +1,173 @@
+export interface ReadFileResponse {
+  content: string;
+  absPath: string;
+}
+
+export async function readFile(file: string): Promise<ReadFileResponse> {
+  const res = await fetch(`/__dev/read?file=${encodeURIComponent(file)}`);
+  if (!res.ok) {
+    throw new Error(`read failed: ${res.status} ${await res.text()}`);
+  }
+  return res.json();
+}
+
+export async function writeFile(
+  file: string,
+  content: string,
+): Promise<{ ok: true; absPath: string }> {
+  const res = await fetch("/__dev/write", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file, content }),
+  });
+  if (!res.ok) {
+    throw new Error(`write failed: ${res.status} ${await res.text()}`);
+  }
+  return res.json();
+}
+
+export async function patchStyle(args: {
+  file: string;
+  line: number;
+  column: number;
+  /** `null` value = remove that property. */
+  styleUpdates: Record<string, string | null>;
+}): Promise<{ ok: true; absPath: string }> {
+  const res = await fetch("/__dev/patch-style", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(args),
+  });
+  if (!res.ok) {
+    throw new Error(`patch-style failed: ${res.status} ${await res.text()}`);
+  }
+  return res.json();
+}
+
+export interface TokenInfo {
+  name: string;
+  value: string;
+  group: "color" | "radius" | "shadow" | "motion" | "gradient" | "other";
+  kind: "color" | "size" | "time" | "text";
+}
+
+const TOKEN_PREFIXES = ["--color-", "--radius-", "--shadow-", "--motion-", "--gradient-"];
+
+function inferGroup(name: string): TokenInfo["group"] {
+  if (name.startsWith("--color-")) return "color";
+  if (name.startsWith("--radius-")) return "radius";
+  if (name.startsWith("--shadow-")) return "shadow";
+  if (name.startsWith("--motion-")) return "motion";
+  if (name.startsWith("--gradient-")) return "gradient";
+  return "other";
+}
+
+function inferKind(name: string, value: string): TokenInfo["kind"] {
+  const trimmed = value.trim();
+  if (name.startsWith("--color-")) return "color";
+  if (name.startsWith("--gradient-")) return "text";
+  if (name.startsWith("--shadow-")) return "text";
+  if (name.startsWith("--motion-") || /^\d+m?s$/.test(trimmed)) return "time";
+  if (/^-?\d+(\.\d+)?(px|rem|em|%)?$/.test(trimmed)) return "size";
+  if (/^#([0-9a-f]{3,8})$/i.test(trimmed) || trimmed.startsWith("rgb")) return "color";
+  return "text";
+}
+
+export function readAllTokens(): TokenInfo[] {
+  const tokens: TokenInfo[] = [];
+  const seen = new Set<string>();
+
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRuleList | null = null;
+    try {
+      rules = sheet.cssRules;
+    } catch {
+      continue;
+    }
+    if (!rules) continue;
+
+    for (const rule of Array.from(rules)) {
+      if (!(rule instanceof CSSStyleRule)) continue;
+      if (rule.selectorText !== ":root") continue;
+
+      const style = rule.style;
+      for (let i = 0; i < style.length; i++) {
+        const name = style.item(i);
+        if (!name.startsWith("--")) continue;
+        if (!TOKEN_PREFIXES.some((p) => name.startsWith(p))) continue;
+        if (seen.has(name)) continue;
+        seen.add(name);
+
+        const inline = document.documentElement.style.getPropertyValue(name);
+        const value = (inline || style.getPropertyValue(name)).trim();
+        tokens.push({
+          name,
+          value,
+          group: inferGroup(name),
+          kind: inferKind(name, value),
+        });
+      }
+    }
+  }
+
+  const order: TokenInfo["group"][] = ["color", "radius", "shadow", "motion", "gradient", "other"];
+  tokens.sort((a, b) => {
+    const ai = order.indexOf(a.group);
+    const bi = order.indexOf(b.group);
+    if (ai !== bi) return ai - bi;
+    return a.name.localeCompare(b.name);
+  });
+
+  return tokens;
+}
+
+export function applyTokenOverride(name: string, value: string) {
+  document.documentElement.style.setProperty(name, value);
+}
+
+export function clearTokenOverrides(names: string[]) {
+  for (const n of names) {
+    document.documentElement.style.removeProperty(n);
+  }
+}
+
+/**
+ * Patches the `:root { }` block in a CSS text, replacing values for
+ * the provided variables in place. Variables not present are appended.
+ */
+export function patchRootBlock(
+  css: string,
+  overrides: Record<string, string>,
+): string {
+  const rootRegex = /(:root\s*\{)([\s\S]*?)(\n\})/;
+  const match = css.match(rootRegex);
+  if (!match) {
+    throw new Error("Could not locate `:root { ... }` block in CSS");
+  }
+  const [, head, body, tail] = match;
+
+  let patched = body!;
+  const leftovers: Record<string, string> = {};
+
+  for (const [name, value] of Object.entries(overrides)) {
+    const varRegex = new RegExp(
+      `(\\s*${name.replace(/[-]/g, "\\-")}\\s*:\\s*)[^;]*(;)`,
+      "m",
+    );
+    if (varRegex.test(patched)) {
+      patched = patched.replace(varRegex, `$1${value}$2`);
+    } else {
+      leftovers[name] = value;
+    }
+  }
+
+  const leftoverLines = Object.entries(leftovers)
+    .map(([n, v]) => `  ${n}: ${v};`)
+    .join("\n");
+
+  if (leftoverLines) {
+    patched = `${patched.replace(/\s*$/, "")}\n${leftoverLines}\n`;
+  }
+
+  return css.replace(rootRegex, `${head}${patched}${tail}`);
+}
