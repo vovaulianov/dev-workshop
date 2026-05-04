@@ -132,8 +132,24 @@ function SegmentEl({ seg }: { seg: Segment }) {
       <Tick cx={seg.x1} cy={seg.y1} horizontal={isH} />
       <Tick cx={seg.x2} cy={seg.y2} horizontal={isH} />
       <div
-        className="pointer-events-none absolute rounded bg-[#ff4d6d] px-1 py-[1px] text-[9px] font-semibold leading-[1.1] text-white tabular-nums"
-        style={{ left: seg.labelX, top: seg.labelY, transform: "translate(-50%, -50%)", zIndex: 1003 }}
+        style={{
+          position: "absolute",
+          pointerEvents: "none",
+          left: seg.labelX,
+          top: seg.labelY,
+          transform: isH ? "translate(-50%, calc(-100% - 4px))" : "translate(8px, -50%)",
+          zIndex: 1003,
+          background: "#ff4d6d",
+          color: "white",
+          fontSize: 11,
+          fontWeight: 600,
+          lineHeight: 1,
+          fontVariantNumeric: "tabular-nums",
+          padding: "2px 6px",
+          borderRadius: 3,
+          boxShadow: "0 1px 2px rgba(0,0,0,0.25)",
+          whiteSpace: "nowrap",
+        }}
       >
         {seg.label}
       </div>
