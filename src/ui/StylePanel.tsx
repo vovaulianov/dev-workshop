@@ -46,8 +46,8 @@ export function StylePanel({
   }, [selectedElement]);
 
   return (
-    <aside className="flex h-full min-w-0 flex-1 flex-col border-l border-[#e5e5e5] bg-white text-[#101114]">
-      <div className="flex border-b border-[#e5e5e5]">
+    <aside style={{ display: "flex", height: "100%", minWidth: 0, flex: 1, flexDirection: "column", borderLeft: "1px solid #e5e5e5", background: "white", color: "#101114" }}>
+      <div style={{ display: "flex", borderBottom: "1px solid #e5e5e5" }}>
         {selectedElement && <TabButton active={tab === "element"} onClick={() => setTab("element")}>Element</TabButton>}
         <TabButton active={tab === "props"} onClick={() => setTab("props")}>Props</TabButton>
         <TabButton active={tab === "tokens"} onClick={() => setTab("tokens")}>Tokens</TabButton>
@@ -73,10 +73,7 @@ export function StylePanel({
 
 function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button
-      onClick={onClick}
-      className={["flex-1 px-4 py-2.5 text-[13px] font-medium transition-colors", active ? "bg-[#f4f4f4] text-[#101114]" : "text-[#808080] hover:bg-[#fafafa] hover:text-[#101114]"].join(" ")}
-    >
+    <button onClick={onClick} className="dw-tab" data-active={active ? "true" : "false"}>
       {children}
     </button>
   );
@@ -95,15 +92,15 @@ function PropsTab({ entry, variantIndex, argsOverride, onArgsOverrideChange }: {
   const dirty = Object.keys(argsOverride).length > 0;
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto px-3 py-3">
-        <div className="mb-2 flex items-baseline justify-between">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-[#b3b3b3]">{entry.name} · {variant.name}</div>
-          {dirty && <button onClick={resetAll} className="text-[10px] text-[#606060] hover:text-[#101114]">reset all</button>}
+    <div style={{ display: "flex", flex: 1, flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 12px" }}>
+        <div style={{ marginBottom: 8, display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+          <div className="dw-section-label">{entry.name} · {variant.name}</div>
+          {dirty && <button onClick={resetAll} className="dw-link">reset all</button>}
         </div>
-        <div className="flex flex-col gap-2.5">
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {descriptors.map((d) => <PropRow key={d.key} descriptor={d} value={currentArgs[d.key]} overridden={d.key in argsOverride} onChange={(v) => setArg(d.key, v)} onReset={() => resetOne(d.key)} />)}
-          {descriptors.length === 0 && <div className="px-1 py-2 text-[11px] text-[#808080]">No props documented in stories for this component.</div>}
+          {descriptors.length === 0 && <div style={{ padding: "8px 4px", fontSize: 11, color: "#808080" }}>No props documented in stories for this component.</div>}
         </div>
       </div>
     </div>
@@ -113,12 +110,12 @@ function PropsTab({ entry, variantIndex, argsOverride, onArgsOverrideChange }: {
 function PropRow({ descriptor, value, overridden, onChange, onReset }: { descriptor: PropDescriptor; value: unknown; overridden: boolean; onChange: (v: unknown) => void; onReset: () => void }) {
   const { key, control } = descriptor;
   return (
-    <div className={["rounded-md border border-transparent px-2 py-1.5", overridden ? "border-[#e5e5e5] bg-[#fafafa]" : ""].join(" ")}>
-      <div className="mb-1 flex items-center justify-between">
-        <label className="font-mono text-[11px] text-[#101114]">{key}</label>
-        <div className="flex items-center gap-2 text-[9px] text-[#b3b3b3]">
-          <span className="uppercase tracking-wider">{control.kind}</span>
-          {overridden && <button onClick={onReset} className="rounded px-1 py-0.5 text-[#606060] hover:bg-[#ebebeb] hover:text-[#101114]">reset</button>}
+    <div style={{ borderRadius: 6, border: overridden ? "1px solid #e5e5e5" : "1px solid transparent", background: overridden ? "#fafafa" : "transparent", padding: "6px 8px" }}>
+      <div style={{ marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <label className="dw-mono" style={{ fontSize: 11, color: "#101114" }}>{key}</label>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 9, color: "#b3b3b3" }}>
+          <span style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>{control.kind}</span>
+          {overridden && <button onClick={onReset} className="dw-ghost">reset</button>}
         </div>
       </div>
       <PropControl control={control} value={value} onChange={onChange} />
@@ -136,16 +133,16 @@ function JsonControl({ value, onChange }: { value: unknown; onChange: (v: unknow
 function ObjectEditor({ value, onChange, onSwitchToRaw }: { value: Record<string, unknown>; onChange: (v: unknown) => void; onSwitchToRaw: () => void }) {
   const setKey = (key: string, nextVal: unknown) => onChange({ ...value, [key]: nextVal });
   return (
-    <div className="rounded border border-[#e5e5e5] bg-white">
-      <div className="flex items-center justify-between border-b border-[#e5e5e5] px-2 py-1">
-        <div className="font-mono text-[9px] uppercase tracking-wider text-[#b3b3b3]">object · {Object.keys(value).length} keys</div>
-        <button onClick={onSwitchToRaw} className="rounded bg-[#f4f4f4] px-1.5 py-0.5 text-[9px] text-[#606060] hover:bg-[#ebebeb]">raw json</button>
+    <div style={{ borderRadius: 4, border: "1px solid #e5e5e5", background: "white" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e5e5", padding: "4px 8px" }}>
+        <div className="dw-mono" style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.05em", color: "#b3b3b3" }}>object · {Object.keys(value).length} keys</div>
+        <button onClick={onSwitchToRaw} className="dw-ghost">raw json</button>
       </div>
-      <div className="flex flex-col">
-        {Object.entries(value).map(([k, v]) => (
-          <div key={k} className="grid grid-cols-[90px_1fr] items-start gap-2 border-b border-[#f1f1f1] px-2 py-1 last:border-b-0">
-            <label className="truncate pt-1 font-mono text-[10px] text-[#404040]" title={k}>{k}</label>
-            <div className="min-w-0"><ObjectValueControl value={v} type={v === null ? "null" : typeof v} onChange={(nv) => setKey(k, nv)} /></div>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        {Object.entries(value).map(([k, v], idx, arr) => (
+          <div key={k} style={{ display: "grid", gridTemplateColumns: "90px 1fr", alignItems: "start", gap: 8, borderBottom: idx < arr.length - 1 ? "1px solid #f1f1f1" : undefined, padding: "4px 8px" }}>
+            <label className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingTop: 4, fontSize: 10, color: "#404040" }} title={k}>{k}</label>
+            <div style={{ minWidth: 0 }}><ObjectValueControl value={v} type={v === null ? "null" : typeof v} onChange={(nv) => setKey(k, nv)} /></div>
           </div>
         ))}
       </div>
@@ -157,19 +154,32 @@ function ObjectValueControl({ value, type, onChange }: { value: unknown; type: s
   if (type === "boolean") {
     const checked = Boolean(value);
     return (
-      <button onClick={() => onChange(!checked)} className={["flex h-5 w-9 items-center rounded-full border transition-colors", checked ? "justify-end border-[#101114] bg-[#101114]" : "justify-start border-[#e5e5e5] bg-[#f4f4f4]"].join(" ")}>
-        <span className="mx-0.5 h-4 w-4 rounded-full bg-white" />
+      <button
+        onClick={() => onChange(!checked)}
+        style={{
+          display: "flex",
+          height: 20,
+          width: 36,
+          alignItems: "center",
+          justifyContent: checked ? "flex-end" : "flex-start",
+          borderRadius: 999,
+          border: checked ? "1px solid #101114" : "1px solid #e5e5e5",
+          background: checked ? "#101114" : "#f4f4f4",
+          transition: "background 120ms",
+        }}
+      >
+        <span style={{ margin: "0 2px", height: 16, width: 16, borderRadius: 999, background: "white" }} />
       </button>
     );
   }
-  if (type === "number") return <input type="number" value={typeof value === "number" ? value : ""} onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))} className="w-full rounded bg-[#f4f4f4] px-1.5 py-0.5 font-mono text-[10px] text-[#101114] outline-none focus:bg-[#ebebeb]" />;
+  if (type === "number") return <input type="number" value={typeof value === "number" ? value : ""} onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))} className="dw-input dw-input-sm" />;
   if (type === "string") {
     const str = (value as string) ?? "";
     const isLong = str.length > 40 || str.includes("\n");
-    if (isLong) return <textarea value={str} onChange={(e) => onChange(e.target.value)} rows={Math.min(5, Math.max(2, str.split("\n").length))} className="w-full resize-none rounded bg-[#f4f4f4] px-1.5 py-0.5 font-mono text-[10px] leading-[1.4] text-[#101114] outline-none focus:bg-[#ebebeb]" spellCheck={false} />;
-    return <input type="text" value={str} onChange={(e) => onChange(e.target.value)} className="w-full rounded bg-[#f4f4f4] px-1.5 py-0.5 font-mono text-[10px] text-[#101114] outline-none focus:bg-[#ebebeb]" />;
+    if (isLong) return <textarea value={str} onChange={(e) => onChange(e.target.value)} rows={Math.min(5, Math.max(2, str.split("\n").length))} className="dw-input dw-input-sm" style={{ resize: "none", lineHeight: 1.4 }} spellCheck={false} />;
+    return <input type="text" value={str} onChange={(e) => onChange(e.target.value)} className="dw-input dw-input-sm" />;
   }
-  if (value === undefined) return <input type="text" value="" placeholder="undefined — type to set" onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)} className="w-full rounded bg-[#f4f4f4] px-1.5 py-0.5 font-mono text-[10px] text-[#101114] placeholder:italic placeholder:text-[#b3b3b3] outline-none focus:bg-[#ebebeb]" />;
+  if (value === undefined) return <input type="text" value="" placeholder="undefined — type to set" onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)} className="dw-input dw-input-sm" style={{ fontStyle: "normal" }} />;
   return <RawJsonEditor value={value} onChange={onChange} />;
 }
 
@@ -182,9 +192,13 @@ function RawJsonEditor({ value, onChange, onSwitchToObject }: { value: unknown; 
   const safeText = typeof text === "string" ? text : "";
   return (
     <div>
-      {onSwitchToObject && <div className="mb-1 flex justify-end"><button onClick={onSwitchToObject} className="rounded bg-[#f4f4f4] px-1.5 py-0.5 text-[9px] text-[#606060] hover:bg-[#ebebeb]">back to keys</button></div>}
-      <textarea value={safeText} onChange={(e) => setText(e.target.value)} onBlur={(e) => commit(e.target.value)} rows={Math.min(14, Math.max(3, safeText.split("\n").length))} className="w-full resize-y rounded bg-[#f4f4f4] px-2 py-1 font-mono text-[10px] leading-[1.5] text-[#101114] outline-none focus:bg-[#ebebeb]" spellCheck={false} />
-      {error && <div className="mt-1 text-[10px] text-[#e6365a]">{error}</div>}
+      {onSwitchToObject && (
+        <div style={{ marginBottom: 4, display: "flex", justifyContent: "flex-end" }}>
+          <button onClick={onSwitchToObject} className="dw-ghost">back to keys</button>
+        </div>
+      )}
+      <textarea value={safeText} onChange={(e) => setText(e.target.value)} onBlur={(e) => commit(e.target.value)} rows={Math.min(14, Math.max(3, safeText.split("\n").length))} className="dw-input dw-input-sm" style={{ resize: "vertical", lineHeight: 1.5 }} spellCheck={false} />
+      {error && <div style={{ marginTop: 4, fontSize: 10, color: "#e6365a" }}>{error}</div>}
     </div>
   );
 }
@@ -193,26 +207,41 @@ function PropControl({ control, value, onChange }: { control: PropDescriptor["co
   if (control.kind === "boolean") {
     const checked = Boolean(value);
     return (
-      <button onClick={() => onChange(!checked)} className={["flex h-6 w-11 items-center rounded-full border transition-colors", checked ? "justify-end border-[#101114] bg-[#101114]" : "justify-start border-[#e5e5e5] bg-[#f4f4f4]"].join(" ")}>
-        <span className="mx-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform" />
+      <button
+        onClick={() => onChange(!checked)}
+        style={{
+          display: "flex",
+          height: 24,
+          width: 44,
+          alignItems: "center",
+          justifyContent: checked ? "flex-end" : "flex-start",
+          borderRadius: 999,
+          border: checked ? "1px solid #101114" : "1px solid #e5e5e5",
+          background: checked ? "#101114" : "#f4f4f4",
+          transition: "background 120ms",
+        }}
+      >
+        <span style={{ margin: "0 2px", height: 20, width: 20, borderRadius: 999, background: "white", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }} />
       </button>
     );
   }
-  if (control.kind === "number") return <input type="number" value={typeof value === "number" ? value : ""} onChange={(e) => { const v = e.target.value; onChange(v === "" ? undefined : Number(v)); }} className="w-full rounded bg-[#f4f4f4] px-2 py-1 font-mono text-[11px] text-[#101114] outline-none focus:bg-[#ebebeb]" />;
+  if (control.kind === "number") return <input type="number" value={typeof value === "number" ? value : ""} onChange={(e) => { const v = e.target.value; onChange(v === "" ? undefined : Number(v)); }} className="dw-input" />;
   if (control.kind === "select") {
     return (
-      <div className="flex flex-wrap gap-1">
-        {control.options.map((opt) => <button key={opt} onClick={() => onChange(opt)} className={["rounded px-2 py-1 font-mono text-[10px] transition-colors", value === opt ? "bg-[#101114] text-white" : "bg-[#f4f4f4] text-[#606060] hover:bg-[#ebebeb]"].join(" ")}>{opt}</button>)}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+        {control.options.map((opt) => (
+          <button key={opt} onClick={() => onChange(opt)} className="dw-pill" data-active={value === opt ? "true" : "false"}>{opt}</button>
+        ))}
       </div>
     );
   }
   if (control.kind === "json") return <JsonControl value={value} onChange={onChange} />;
   if (control.kind === "node") {
     const isScalar = value === null || value === undefined || typeof value === "string";
-    if (!isScalar) return <div className="rounded bg-[#f4f4f4] px-2 py-1 font-mono text-[10px] text-[#808080]">(ReactNode — not editable)</div>;
-    return <input type="text" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} className="w-full rounded bg-[#f4f4f4] px-2 py-1 font-mono text-[11px] text-[#101114] outline-none focus:bg-[#ebebeb]" />;
+    if (!isScalar) return <div className="dw-mono" style={{ borderRadius: 4, background: "#f4f4f4", padding: "4px 8px", fontSize: 10, color: "#808080" }}>(ReactNode — not editable)</div>;
+    return <input type="text" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} className="dw-input" />;
   }
-  return <input type="text" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} className="w-full rounded bg-[#f4f4f4] px-2 py-1 font-mono text-[11px] text-[#101114] outline-none focus:bg-[#ebebeb]" />;
+  return <input type="text" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} className="dw-input" />;
 }
 
 /* ─────────────────────────────── Tokens Tab ─────────────────────────────── */
@@ -242,22 +271,22 @@ function TokensTab({ tokensCssFile }: { tokensCssFile: string }) {
   const dirty = Object.keys(overrides).length > 0;
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex-1 overflow-y-auto px-3 py-3 text-[12px]">
+    <div style={{ display: "flex", flex: 1, flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: 12, fontSize: 12 }}>
         {Object.entries(groups).map(([group, tokensInGroup]) => (
-          <div key={group} className="mb-4">
-            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[#b3b3b3]">{group}</div>
-            <div className="flex flex-col gap-1.5">
+          <div key={group} style={{ marginBottom: 16 }}>
+            <div className="dw-section-label" style={{ marginBottom: 8 }}>{group}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {tokensInGroup.map((t) => <TokenRow key={t.name} token={t} overrideValue={overrides[t.name]} onChange={handleChange} />)}
             </div>
           </div>
         ))}
       </div>
-      <div className="border-t border-[#e5e5e5] p-3">
-        {statusMessage && <div className={["mb-2 truncate text-[11px]", status === "error" ? "text-[#e6365a]" : "text-[#1f9d55]"].join(" ")}>{statusMessage}</div>}
-        <div className="flex gap-2">
-          <button onClick={reset} disabled={!dirty} className="flex-1 rounded-md border border-[#e5e5e5] bg-white py-2 text-[12px] text-[#606060] transition-colors hover:bg-[#fafafa] disabled:opacity-30">Reset</button>
-          <button onClick={save} disabled={!dirty || status === "saving"} className="flex-1 rounded-md bg-[#101114] py-2 text-[12px] font-semibold text-white transition-opacity disabled:opacity-30">
+      <div style={{ borderTop: "1px solid #e5e5e5", padding: 12 }}>
+        {statusMessage && <div style={{ marginBottom: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: status === "error" ? "#e6365a" : "#1f9d55" }}>{statusMessage}</div>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={reset} disabled={!dirty} className="dw-btn-secondary">Reset</button>
+          <button onClick={save} disabled={!dirty || status === "saving"} className="dw-btn-primary">
             {status === "saving" ? "Saving…" : "Save to CSS"}
           </button>
         </div>
@@ -271,16 +300,18 @@ function TokenRow({ token, overrideValue, onChange }: { token: TokenInfo; overri
   const dirty = overrideValue !== undefined;
   const handleInput = (v: string) => onChange(token.name, v);
   return (
-    <div className={["grid grid-cols-[1fr_auto] items-center gap-2 rounded-md px-2 py-1", dirty ? "bg-[#fff4f4]" : ""].join(" ")}>
-      <div className="min-w-0"><div className="truncate font-mono text-[11px] text-[#404040]">{token.name}</div></div>
-      <div className="flex items-center gap-1.5">
+    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8, borderRadius: 6, background: dirty ? "#fff4f4" : "transparent", padding: "4px 8px" }}>
+      <div style={{ minWidth: 0 }}>
+        <div className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "#404040" }}>{token.name}</div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         {token.kind === "color" ? (
           <>
-            <input type="color" value={normalizeColor(value)} onChange={(e) => handleInput(e.target.value)} className="h-6 w-6 cursor-pointer rounded border border-[#e5e5e5] bg-white" />
-            <input type="text" value={value} onChange={(e) => handleInput(e.target.value)} className="w-20 rounded bg-[#f4f4f4] px-1.5 py-0.5 font-mono text-[10px] text-[#101114] outline-none focus:bg-[#ebebeb]" />
+            <input type="color" value={normalizeColor(value)} onChange={(e) => handleInput(e.target.value)} style={{ height: 24, width: 24, cursor: "pointer", borderRadius: 4, border: "1px solid #e5e5e5", background: "white", padding: 0 }} />
+            <input type="text" value={value} onChange={(e) => handleInput(e.target.value)} className="dw-input dw-input-sm" style={{ width: 80 }} />
           </>
         ) : (
-          <input type="text" value={value} onChange={(e) => handleInput(e.target.value)} className="w-36 rounded bg-[#f4f4f4] px-1.5 py-0.5 font-mono text-[10px] text-[#101114] outline-none focus:bg-[#ebebeb]" />
+          <input type="text" value={value} onChange={(e) => handleInput(e.target.value)} className="dw-input dw-input-sm" style={{ width: 144 }} />
         )}
       </div>
     </div>
@@ -341,15 +372,36 @@ function CodeTab({ entry }: { entry: ComponentEntry }) {
   };
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex items-center justify-between border-b border-[#e5e5e5] px-3 py-2 text-[11px]">
-        <div className="truncate font-mono text-[#808080]">{entry.sourceFile}</div>
-        {absPath && <a href={`vscode://file${absPath}`} className="shrink-0 text-[#606060] underline-offset-2 hover:text-[#101114] hover:underline">Open in VS Code</a>}
+    <div style={{ display: "flex", flex: 1, flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e5e5", padding: "8px 12px", fontSize: 11 }}>
+        <div className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#808080" }}>{entry.sourceFile}</div>
+        {absPath && <a href={`vscode://file${absPath}`} style={{ flexShrink: 0, color: "#606060", textDecoration: "none" }} onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; e.currentTarget.style.color = "#101114"; }} onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; e.currentTarget.style.color = "#606060"; }}>Open in VS Code</a>}
       </div>
-      <textarea ref={textareaRef} value={content} readOnly={!loaded} onChange={(e) => { setContent(e.target.value); setDirty(true); }} onKeyDown={handleKeyDown} spellCheck={false} className="flex-1 resize-none whitespace-pre bg-[#fafafa] px-3 py-2 font-mono text-[11.5px] leading-[1.55] text-[#101114] outline-none" style={{ tabSize: 2 }} />
-      <div className="border-t border-[#e5e5e5] p-3">
-        {statusMessage && <div className={["mb-2 truncate text-[11px]", status === "error" ? "text-[#e6365a]" : "text-[#1f9d55]"].join(" ")}>{statusMessage}</div>}
-        <button onClick={save} disabled={!dirty || status === "saving"} className="w-full rounded-md bg-[#101114] py-2 text-[12px] font-semibold text-white transition-opacity disabled:opacity-30">
+      <textarea
+        ref={textareaRef}
+        value={content}
+        readOnly={!loaded}
+        onChange={(e) => { setContent(e.target.value); setDirty(true); }}
+        onKeyDown={handleKeyDown}
+        spellCheck={false}
+        className="dw-mono"
+        style={{
+          flex: 1,
+          resize: "none",
+          whiteSpace: "pre",
+          background: "#fafafa",
+          padding: "8px 12px",
+          fontSize: 11.5,
+          lineHeight: 1.55,
+          color: "#101114",
+          outline: "none",
+          tabSize: 2,
+          border: "none",
+        }}
+      />
+      <div style={{ borderTop: "1px solid #e5e5e5", padding: 12 }}>
+        {statusMessage && <div style={{ marginBottom: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: status === "error" ? "#e6365a" : "#1f9d55" }}>{statusMessage}</div>}
+        <button onClick={save} disabled={!dirty || status === "saving"} className="dw-btn-primary">
           {status === "saving" ? "Saving…" : dirty ? "Save (⌘S)" : "No changes"}
         </button>
       </div>

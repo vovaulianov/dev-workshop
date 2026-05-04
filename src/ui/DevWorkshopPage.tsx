@@ -32,6 +32,251 @@ function readLSNumber(key: string, fallback: number): number {
   return Number.isFinite(v) && v > 0 ? v : fallback;
 }
 
+const STYLES = `
+[data-dev-workshop] {
+  --dw-bg: white;
+  --dw-bg-soft: #fafafa;
+  --dw-bg-input: #f4f4f4;
+  --dw-bg-input-hover: #ebebeb;
+  --dw-bg-active: #101114;
+  --dw-bg-dirty: #fff4f4;
+  --dw-bg-canvas: #F4F4F4;
+  --dw-text: #101114;
+  --dw-text-secondary: #404040;
+  --dw-text-muted: #606060;
+  --dw-text-subtle: #808080;
+  --dw-text-placeholder: #b3b3b3;
+  --dw-border: #e5e5e5;
+  --dw-border-soft: #f1f1f1;
+  --dw-accent: #3b82f6;
+  --dw-error: #e6365a;
+  --dw-success: #1f9d55;
+  --dw-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --dw-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+/* All chrome styles below are scoped to .dw-* classes only.
+   We never cascade into descendants of [data-dev-workshop], because the
+   user's components render inside the canvas as descendants too — any
+   global rule on button / input / * would leak into them. */
+[data-dev-workshop] .dw-mono { font-family: var(--dw-font-mono); }
+[data-dev-workshop] .dw-kbd {
+  font-family: var(--dw-font-mono);
+  background: var(--dw-bg-input);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+/* Each chrome class is self-contained: includes its own font-family, border:none,
+   background, padding, etc. so we don't rely on global resets that would leak
+   into the user's components rendered inside the canvas. */
+
+[data-dev-workshop] .dw-input {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  margin: 0;
+  background: var(--dw-bg-input);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: var(--dw-font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--dw-text);
+  width: 100%;
+  transition: background 120ms;
+}
+[data-dev-workshop] .dw-input:focus { background: var(--dw-bg-input-hover); }
+[data-dev-workshop] .dw-input::placeholder { color: var(--dw-text-placeholder); }
+[data-dev-workshop] .dw-input.dw-input-sm { font-size: 10px; padding: 3px 6px; border-radius: 3px; }
+
+[data-dev-workshop] .dw-search {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  margin: 0;
+  background: var(--dw-bg-input);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: var(--dw-font);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--dw-text);
+  width: 100%;
+  transition: background 120ms;
+}
+[data-dev-workshop] .dw-search:focus { background: var(--dw-bg-input-hover); }
+[data-dev-workshop] .dw-search::placeholder { color: var(--dw-text-placeholder); }
+
+[data-dev-workshop] .dw-btn-primary {
+  appearance: none;
+  box-sizing: border-box;
+  cursor: pointer;
+  border: none;
+  margin: 0;
+  background: var(--dw-bg-active);
+  color: white;
+  font-family: var(--dw-font);
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 8px 12px;
+  border-radius: 6px;
+  width: 100%;
+  transition: opacity 120ms;
+}
+[data-dev-workshop] .dw-btn-primary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+[data-dev-workshop] .dw-btn-secondary {
+  appearance: none;
+  box-sizing: border-box;
+  cursor: pointer;
+  margin: 0;
+  border: 1px solid var(--dw-border);
+  background: var(--dw-bg);
+  color: var(--dw-text-muted);
+  font-family: var(--dw-font);
+  font-size: 12px;
+  line-height: 1.2;
+  padding: 8px 12px;
+  border-radius: 6px;
+  width: 100%;
+  transition: background 120ms;
+}
+[data-dev-workshop] .dw-btn-secondary:hover:not(:disabled) { background: var(--dw-bg-soft); }
+[data-dev-workshop] .dw-btn-secondary:disabled { opacity: 0.3; cursor: not-allowed; }
+
+[data-dev-workshop] .dw-pill {
+  appearance: none;
+  box-sizing: border-box;
+  cursor: pointer;
+  border: none;
+  margin: 0;
+  background: var(--dw-bg-input);
+  color: var(--dw-text-muted);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-family: var(--dw-font-mono);
+  font-size: 10px;
+  line-height: 1.2;
+  transition: background 120ms, color 120ms;
+}
+[data-dev-workshop] .dw-pill:hover { background: var(--dw-bg-input-hover); }
+[data-dev-workshop] .dw-pill[data-active="true"] {
+  background: var(--dw-bg-active);
+  color: white;
+}
+
+[data-dev-workshop] .dw-tab {
+  appearance: none;
+  box-sizing: border-box;
+  cursor: pointer;
+  border: none;
+  margin: 0;
+  background: transparent;
+  flex: 1 1 0;
+  padding: 10px 16px;
+  font-family: var(--dw-font);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--dw-text-subtle);
+  transition: background 120ms, color 120ms;
+}
+[data-dev-workshop] .dw-tab:hover { background: var(--dw-bg-soft); color: var(--dw-text); }
+[data-dev-workshop] .dw-tab[data-active="true"] { background: var(--dw-bg-input); color: var(--dw-text); }
+
+[data-dev-workshop] .dw-sidebar-item {
+  appearance: none;
+  box-sizing: border-box;
+  cursor: pointer;
+  border: none;
+  margin: 0;
+  background: transparent;
+  display: block;
+  flex: 1;
+  padding: 6px 16px 6px 0;
+  text-align: left;
+  font-family: var(--dw-font);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--dw-text-muted);
+  transition: background 80ms, color 80ms;
+}
+[data-dev-workshop] .dw-sidebar-item:hover { background: var(--dw-bg-soft); color: var(--dw-text); }
+[data-dev-workshop] .dw-sidebar-item[data-active="true"] {
+  background: var(--dw-bg-input);
+  color: var(--dw-text);
+  font-weight: 500;
+}
+[data-dev-workshop] .dw-sidebar-item.dw-sidebar-item-variant {
+  font-size: 12px;
+  padding-left: 40px;
+  color: var(--dw-text-subtle);
+}
+
+[data-dev-workshop] .dw-section-label {
+  font-family: var(--dw-font);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--dw-text-placeholder);
+  line-height: 1.2;
+}
+
+[data-dev-workshop] .dw-link {
+  appearance: none;
+  cursor: pointer;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  font-family: var(--dw-font);
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--dw-text-muted);
+  transition: color 120ms;
+}
+[data-dev-workshop] .dw-link:hover { color: var(--dw-text); }
+
+[data-dev-workshop] .dw-ghost {
+  appearance: none;
+  box-sizing: border-box;
+  cursor: pointer;
+  border: none;
+  margin: 0;
+  background: var(--dw-bg-input);
+  color: var(--dw-text-muted);
+  font-family: var(--dw-font);
+  font-size: 9px;
+  line-height: 1.2;
+  padding: 2px 8px;
+  border-radius: 3px;
+  transition: background 120ms, color 120ms;
+}
+[data-dev-workshop] .dw-ghost:hover { background: var(--dw-bg-input-hover); color: var(--dw-text); }
+
+[data-dev-workshop] .dw-resize {
+  appearance: none;
+  box-sizing: border-box;
+  border: none;
+  margin: 0;
+  padding: 0;
+  width: 4px;
+  flex-shrink: 0;
+  cursor: ew-resize;
+  background: var(--dw-border);
+  transition: background 120ms;
+  align-self: stretch;
+}
+[data-dev-workshop] .dw-resize:hover { background: var(--dw-accent); }
+`;
+
 export interface DevWorkshopPageProps {
   /** Path to the project's main CSS file (Tokens tab "Save" button).
    *  Defaults to `"src/index.css"`. */
@@ -112,53 +357,55 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
 
   if (!selected) {
     return (
-      <div className="fixed inset-0 z-0 flex items-center justify-center bg-white text-[#101114]">
-        <div className="text-center">
-          <div className="text-lg font-semibold">No stories found</div>
-          <div className="mt-2 text-sm text-[#808080]">
-            Create a <code className="font-mono">*.stories.tsx</code> file under <code className="font-mono">src/components/</code>
+      <>
+        <style>{STYLES}</style>
+        <div data-dev-workshop style={{ position: "fixed", inset: 0, zIndex: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "white", color: "#101114" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 600 }}>No stories found</div>
+            <div style={{ marginTop: 8, fontSize: 14, color: "#808080" }}>
+              Create a <code>*.stories.tsx</code> file under <code>src/components/</code>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-0 flex bg-white text-[#101114]" data-dev-workshop>
-      <ComponentSidebar
-        entries={componentEntries}
-        selectedId={selected.id}
-        variantIndex={variantIndex}
-        width={sidebarWidth}
-        onSelect={handleSelect}
-      />
-      <ResizeHandle onMouseDown={startResize("sidebar")} />
-      <ComponentPreview
-        key={selected.id}
-        entry={selected}
-        variantIndex={variantIndex}
-        onVariantChange={handleVariantChange}
-        argsOverride={argsOverride}
-        selected={selectedEl}
-        onSelectElement={setSelectedEl}
-        hideSelectionOutline={outlineHidden}
-      />
-      <ResizeHandle onMouseDown={startResize("panel")} />
-      <div style={{ width: panelWidth }} className="flex h-full shrink-0">
-        <StylePanel
+    <>
+      <style>{STYLES}</style>
+      <div data-dev-workshop style={{ position: "fixed", inset: 0, zIndex: 0, display: "flex", background: "white", color: "#101114" }}>
+        <ComponentSidebar
+          entries={componentEntries}
+          selectedId={selected.id}
+          variantIndex={variantIndex}
+          width={sidebarWidth}
+          onSelect={handleSelect}
+        />
+        <button className="dw-resize" onMouseDown={startResize("sidebar")} title="Drag to resize" aria-label="resize sidebar" />
+        <ComponentPreview
+          key={selected.id}
           entry={selected}
           variantIndex={variantIndex}
+          onVariantChange={handleVariantChange}
           argsOverride={argsOverride}
-          onArgsOverrideChange={setArgsOverride}
-          selectedElement={selectedEl}
-          onDeselectElement={() => setSelectedEl(null)}
-          tokensCssFile={tokensCssFile}
+          selected={selectedEl}
+          onSelectElement={setSelectedEl}
+          hideSelectionOutline={outlineHidden}
         />
+        <button className="dw-resize" onMouseDown={startResize("panel")} title="Drag to resize" aria-label="resize panel" />
+        <div style={{ width: panelWidth, display: "flex", height: "100%", flexShrink: 0 }}>
+          <StylePanel
+            entry={selected}
+            variantIndex={variantIndex}
+            argsOverride={argsOverride}
+            onArgsOverrideChange={setArgsOverride}
+            selectedElement={selectedEl}
+            onDeselectElement={() => setSelectedEl(null)}
+            tokensCssFile={tokensCssFile}
+          />
+        </div>
       </div>
-    </div>
+    </>
   );
-}
-
-function ResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) {
-  return <div onMouseDown={onMouseDown} title="Drag to resize" className="group flex w-1 shrink-0 cursor-ew-resize items-stretch bg-[#e5e5e5] hover:bg-[#3b82f6]" />;
 }

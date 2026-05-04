@@ -59,7 +59,7 @@ export function ComponentPreview({ entry, variantIndex, argsOverride, selected, 
     try {
       return renderVariant(entry, variant, argsOverride ?? {});
     } catch (err) {
-      return <div className="p-4 text-sm text-red-600">Render error: {String(err)}</div>;
+      return <div style={{ padding: 16, fontSize: 13, color: "#dc2626" }}>Render error: {String(err)}</div>;
     }
   }, [entry, variant, argsOverride]);
 
@@ -123,52 +123,74 @@ export function ComponentPreview({ entry, variantIndex, argsOverride, selected, 
   const widthLabel = width === "full" ? "full" : `${width}px`;
 
   return (
-    <section className="flex h-full flex-1 flex-col bg-white text-[#101114]">
-      <header className="flex items-center justify-between gap-4 border-b border-[#e5e5e5] px-4 py-3">
-        <div className="flex min-w-0 items-baseline gap-3">
-          <h1 className="shrink-0 text-[15px] font-semibold text-[#101114]">{entry.name}</h1>
+    <section style={{ display: "flex", height: "100%", flex: 1, flexDirection: "column", background: "white", color: "#101114" }}>
+      <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, borderBottom: "1px solid #e5e5e5", padding: "12px 16px" }}>
+        <div style={{ display: "flex", minWidth: 0, alignItems: "baseline", gap: 12 }}>
+          <h1 style={{ flexShrink: 0, fontSize: 15, fontWeight: 600, color: "#101114", margin: 0 }}>{entry.name}</h1>
           {entry.variants[variantIndex] && entry.variants.length > 1 && (
-            <div className="shrink-0 rounded-full bg-[#f4f4f4] px-2 py-0.5 text-[11px] text-[#606060]">{entry.variants[variantIndex]!.name}</div>
+            <div style={{ flexShrink: 0, borderRadius: 999, background: "#f4f4f4", padding: "2px 8px", fontSize: 11, color: "#606060" }}>{entry.variants[variantIndex]!.name}</div>
           )}
-          <div className="truncate font-mono text-[11px] text-[#b3b3b3]">{entry.sourceFile}</div>
+          <div className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "#b3b3b3" }}>{entry.sourceFile}</div>
         </div>
-        <div className="font-mono text-[10px] text-[#b3b3b3]">
-          <kbd className="rounded bg-[#f4f4f4] px-1 py-0.5">⌘</kbd>+click to select ·{" "}
-          <kbd className="rounded bg-[#f4f4f4] px-1 py-0.5">⌥</kbd>+hover for distance ·{" "}
-          <kbd className="rounded bg-[#f4f4f4] px-1 py-0.5">esc</kbd> to hide outline
+        <div className="dw-mono" style={{ fontSize: 10, color: "#b3b3b3", flexShrink: 0 }}>
+          <kbd className="dw-kbd">⌘</kbd>+click to select · <kbd className="dw-kbd">⌥</kbd>+hover for distance · <kbd className="dw-kbd">esc</kbd> to hide outline
         </div>
       </header>
 
-      <div className="flex items-center gap-2 border-b border-[#e5e5e5] px-4 py-2">
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-[#b3b3b3]">Width</div>
-        <div className="flex gap-1">
+      <div style={{ display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid #e5e5e5", padding: "8px 16px" }}>
+        <div className="dw-section-label">Width</div>
+        <div style={{ display: "flex", gap: 4 }}>
           {WIDTH_PRESETS.map((w) => (
-            <button key={w} onClick={() => setWidth(w)} className={["rounded px-2 py-1 font-mono text-[10px] transition-colors", width === w ? "bg-[#101114] text-white" : "bg-[#f4f4f4] text-[#606060] hover:bg-[#ebebeb]"].join(" ")}>{w}</button>
+            <button
+              key={w}
+              onClick={() => setWidth(w)}
+              className="dw-pill"
+              data-active={width === w ? "true" : "false"}
+            >
+              {w}
+            </button>
           ))}
-          <button onClick={() => setWidth("full")} className={["rounded px-2 py-1 font-mono text-[10px] transition-colors", width === "full" ? "bg-[#101114] text-white" : "bg-[#f4f4f4] text-[#606060] hover:bg-[#ebebeb]"].join(" ")}>full</button>
+          <button
+            onClick={() => setWidth("full")}
+            className="dw-pill"
+            data-active={width === "full" ? "true" : "false"}
+          >
+            full
+          </button>
         </div>
-        <div className="ml-2 flex items-center gap-1">
+        <div style={{ marginLeft: 8, display: "flex", alignItems: "center", gap: 4 }}>
           <input
             type="number"
             value={width === "full" ? "" : width}
             onChange={(e) => { const v = Number(e.target.value); if (!Number.isNaN(v) && v > 0) setWidth(v); }}
             placeholder="custom"
-            className="w-20 rounded bg-[#f4f4f4] px-2 py-1 font-mono text-[10px] text-[#101114] outline-none focus:bg-[#ebebeb]"
+            className="dw-input dw-input-sm"
+            style={{ width: 80 }}
           />
-          <span className="font-mono text-[10px] text-[#b3b3b3]">px</span>
+          <span className="dw-mono" style={{ fontSize: 10, color: "#b3b3b3" }}>px</span>
         </div>
-        <div className="ml-auto font-mono text-[10px] text-[#b3b3b3]">{widthLabel}</div>
+        <div className="dw-mono" style={{ marginLeft: "auto", fontSize: 10, color: "#b3b3b3" }}>{widthLabel}</div>
       </div>
 
       <div
         ref={stageRef}
-        className="flex flex-1 items-start justify-center overflow-auto bg-[#F4F4F4] p-4"
-        style={metaHeld ? { cursor: "crosshair" } : undefined}
+        style={{
+          display: "flex",
+          flex: 1,
+          alignItems: "flex-start",
+          justifyContent: "center",
+          overflow: "auto",
+          background: "#F4F4F4",
+          padding: 16,
+          ...(metaHeld ? { cursor: "crosshair" } : null),
+        }}
       >
         <div
           ref={setCanvas}
-          className="relative shrink-0 text-[#101114]"
           style={{
+            position: "relative",
+            flexShrink: 0,
+            color: "#101114",
             ...(width === "full" ? { width: "100%", minHeight: "100%" } : { width: `${width}px`, minHeight: "100%" }),
             transform: "translateZ(0)",
           }}
@@ -176,7 +198,13 @@ export function ComponentPreview({ entry, variantIndex, argsOverride, selected, 
           <PortalTargetProvider target={canvas}>
             {rendered}
           </PortalTargetProvider>
-          {width !== "full" && <div onMouseDown={startDrag} title="Drag to resize" className="absolute top-0 -right-3 h-full w-3 cursor-ew-resize" />}
+          {width !== "full" && (
+            <div
+              onMouseDown={startDrag}
+              title="Drag to resize"
+              style={{ position: "absolute", top: 0, right: -12, height: "100%", width: 12, cursor: "ew-resize" }}
+            />
+          )}
           <SelectionOverlay
             stage={canvas}
             hovered={metaHeld ? hovered : null}

@@ -45,61 +45,68 @@ export function ComponentSidebar({ entries, selectedId, variantIndex, width, onS
   };
 
   return (
-    <aside style={{ width }} className="flex h-full shrink-0 flex-col bg-white text-[#101114]">
-      <div className="flex items-center justify-between border-b border-[#e5e5e5] px-4 py-3">
-        <div className="text-[15px] font-semibold">Dev Workshop</div>
-        <div className="font-mono text-[11px] text-[#b3b3b3]">{entries.length}</div>
+    <aside style={{ width, display: "flex", flexShrink: 0, flexDirection: "column", height: "100%", background: "white", color: "#101114" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e5e5", padding: "12px 16px" }}>
+        <div style={{ fontSize: 15, fontWeight: 600 }}>Dev Workshop</div>
+        <div className="dw-mono" style={{ fontSize: 11, color: "#b3b3b3" }}>{entries.length}</div>
       </div>
 
-      <div className="border-b border-[#e5e5e5] px-3 py-2">
+      <div style={{ borderBottom: "1px solid #e5e5e5", padding: "8px 12px" }}>
         <input
           type="search"
           placeholder="Search components…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="w-full rounded-md bg-[#f4f4f4] px-3 py-2 text-[13px] text-[#101114] placeholder:text-[#b3b3b3] outline-none focus:bg-[#ebebeb]"
+          className="dw-search"
         />
       </div>
 
-      <nav className="flex-1 overflow-y-auto py-2">
+      <nav style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
         {categoryOrder.length === 0 && (
-          <div className="px-4 py-6 text-center text-[12px] text-[#b3b3b3]">Nothing matches</div>
+          <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "#b3b3b3" }}>Nothing matches</div>
         )}
         {categoryOrder.map((category) => (
-          <div key={category} className="mb-3">
-            <div className="px-4 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[#b3b3b3]">{category}</div>
-            <ul>
+          <div key={category} style={{ marginBottom: 12 }}>
+            <div className="dw-section-label" style={{ padding: "8px 16px 4px" }}>{category}</div>
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {groups[category]!.map((entry) => {
                 const active = entry.id === selectedId;
                 const open = expanded.has(entry.id);
                 const hasVariants = entry.variants.length > 1;
                 return (
                   <li key={entry.id}>
-                    <div className="flex items-stretch">
+                    <div style={{ display: "flex", alignItems: "stretch" }}>
                       {hasVariants ? (
-                        <button onClick={() => toggle(entry.id)} aria-label={open ? "collapse" : "expand"} className="flex w-5 shrink-0 items-center justify-center text-[10px] text-[#b3b3b3] hover:text-[#101114]">
+                        <button
+                          onClick={() => toggle(entry.id)}
+                          aria-label={open ? "collapse" : "expand"}
+                          style={{ display: "flex", width: 20, flexShrink: 0, alignItems: "center", justifyContent: "center", fontSize: 10, color: "#b3b3b3" }}
+                        >
                           {open ? "▾" : "▸"}
                         </button>
                       ) : (
-                        <span className="w-5 shrink-0" />
+                        <span style={{ width: 20, flexShrink: 0 }} />
                       )}
                       <button
                         onClick={() => onSelect(entry, 0)}
-                        className={["block flex-1 py-1.5 pr-4 text-left text-[13px] transition-colors", active ? "bg-[#f4f4f4] text-[#101114] font-medium" : "text-[#606060] hover:bg-[#fafafa] hover:text-[#101114]"].join(" ")}
+                        className="dw-sidebar-item"
+                        data-active={active ? "true" : "false"}
                       >
                         {entry.name}
-                        {hasVariants && <span className="ml-2 text-[10px] text-[#b3b3b3]">{entry.variants.length}</span>}
+                        {hasVariants && <span style={{ marginLeft: 8, fontSize: 10, color: "#b3b3b3" }}>{entry.variants.length}</span>}
                       </button>
                     </div>
                     {open && hasVariants && (
-                      <ul className="mb-1">
+                      <ul style={{ listStyle: "none", margin: "0 0 4px", padding: 0 }}>
                         {entry.variants.map((v, i) => {
                           const vActive = active && variantIndex === i;
                           return (
                             <li key={v.name}>
                               <button
                                 onClick={() => onSelect(entry, i)}
-                                className={["block w-full py-1 pl-10 pr-4 text-left text-[12px] transition-colors", vActive ? "bg-[#f4f4f4] text-[#101114] font-medium" : "text-[#808080] hover:bg-[#fafafa] hover:text-[#101114]"].join(" ")}
+                                className="dw-sidebar-item dw-sidebar-item-variant"
+                                data-active={vActive ? "true" : "false"}
+                                style={{ width: "100%" }}
                               >
                                 {v.name}
                               </button>

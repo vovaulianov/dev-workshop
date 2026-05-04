@@ -68,24 +68,29 @@ export function SelectionOverlay({ stage, hovered, selected }: Props) {
     <>
       {hoverRect && (
         <div
-          className="pointer-events-none absolute border-2 border-dashed border-[#3b82f6]/70"
           style={{
+            position: "absolute",
+            pointerEvents: "none",
             top: hoverRect.top,
             left: hoverRect.left,
             width: hoverRect.width,
             height: hoverRect.height,
+            border: "2px dashed rgba(59, 130, 246, 0.7)",
             zIndex: 999,
           }}
         />
       )}
       {selectedRect && (
         <div
-          className="pointer-events-none absolute border-2 border-[#3b82f6] shadow-[0_0_0_1px_rgba(59,130,246,0.25)]"
           style={{
+            position: "absolute",
+            pointerEvents: "none",
             top: selectedRect.top,
             left: selectedRect.left,
             width: selectedRect.width,
             height: selectedRect.height,
+            border: "2px solid #3b82f6",
+            boxShadow: "0 0 0 1px rgba(59, 130, 246, 0.25)",
             zIndex: 1000,
           }}
         />

@@ -150,48 +150,48 @@ export function ElementInspector({ element, source, onDeselect }: Props) {
   const hasShadow = computedShadow && computedShadow !== "none";
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      <div className="flex items-center justify-between border-b border-[#e5e5e5] px-3 py-2">
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-mono text-[11px] text-[#101114]">{headerLabel}</div>
-          {source && <div className="truncate font-mono text-[10px] text-[#b3b3b3]">{source.file}:{source.line}:{source.column}</div>}
+    <div style={{ display: "flex", flex: 1, flexDirection: "column", overflow: "hidden" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e5e5", padding: "8px 12px" }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "#101114" }}>{headerLabel}</div>
+          {source && <div className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 10, color: "#b3b3b3" }}>{source.file}:{source.line}:{source.column}</div>}
         </div>
-        <button onClick={onDeselect} className="ml-2 rounded px-2 py-1 text-[11px] text-[#606060] hover:bg-[#f4f4f4] hover:text-[#101114]">×</button>
+        <button onClick={onDeselect} className="dw-ghost" style={{ marginLeft: 8, fontSize: 14, lineHeight: 1, padding: "4px 8px" }}>×</button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-3">
-        {!source && <div className="mb-3 rounded bg-[#fff4f4] px-2 py-2 text-[11px] text-[#e6365a]">This element has no JSX source location. Saves will fail.</div>}
+      <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+        {!source && <div style={{ marginBottom: 12, borderRadius: 4, background: "#fff4f4", padding: "8px", fontSize: 11, color: "#e6365a" }}>This element has no JSX source location. Saves will fail.</div>}
         <LayoutSection element={element} overrides={overrides} onChange={setValue} />
         <Section title="Spacing + Size" defs={SPACING_SIZE} element={element} overrides={overrides} onChange={setValue} />
         <Section title="Typography" defs={TYPOGRAPHY} element={element} overrides={overrides} onChange={setValue} />
         <Section title="Colors" defs={COLORS} element={element} overrides={overrides} onChange={setValue} />
 
-        <div className="mb-4">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[#b3b3b3]">Border</div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="dw-section-label">Border</div>
             {borderVisible
-              ? <button onClick={removeBorder} className="rounded bg-[#f4f4f4] px-2 py-0.5 text-[9px] text-[#606060] hover:bg-[#ebebeb]">remove</button>
-              : <button onClick={addBorder} className="rounded bg-[#f4f4f4] px-2 py-0.5 text-[9px] text-[#606060] hover:bg-[#ebebeb]">+ add</button>}
+              ? <button onClick={removeBorder} className="dw-ghost">remove</button>
+              : <button onClick={addBorder} className="dw-ghost">+ add</button>}
           </div>
-          {borderVisible && <div className="flex flex-col gap-1.5">{BORDER.map((def) => <Row key={def.key} def={def} element={element} override={overrides[def.key]} onChange={(v) => setValue(def, v)} />)}</div>}
+          {borderVisible && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{BORDER.map((def) => <Row key={def.key} def={def} element={element} override={overrides[def.key]} onChange={(v) => setValue(def, v)} />)}</div>}
         </div>
 
-        <div className="mb-4">
-          <div className="mb-2 flex items-center justify-between">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-[#b3b3b3]">Effects</div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="dw-section-label">Effects</div>
             {hasShadow
-              ? <button onClick={() => setValue({ key: "boxShadow", cssProp: "box-shadow", label: "", kind: "shadow" }, "none")} className="rounded bg-[#f4f4f4] px-2 py-0.5 text-[9px] text-[#606060] hover:bg-[#ebebeb]">remove shadow</button>
-              : <button onClick={() => setValue({ key: "boxShadow", cssProp: "box-shadow", label: "", kind: "shadow" }, "0 4px 12px rgba(0, 0, 0, 0.08)")} className="rounded bg-[#f4f4f4] px-2 py-0.5 text-[9px] text-[#606060] hover:bg-[#ebebeb]">+ add shadow</button>}
+              ? <button onClick={() => setValue({ key: "boxShadow", cssProp: "box-shadow", label: "", kind: "shadow" }, "none")} className="dw-ghost">remove shadow</button>
+              : <button onClick={() => setValue({ key: "boxShadow", cssProp: "box-shadow", label: "", kind: "shadow" }, "0 4px 12px rgba(0, 0, 0, 0.08)")} className="dw-ghost">+ add shadow</button>}
           </div>
-          <div className="flex flex-col gap-1.5">{EFFECTS.map((def) => <Row key={def.key} def={def} element={element} override={overrides[def.key]} onChange={(v) => setValue(def, v)} />)}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{EFFECTS.map((def) => <Row key={def.key} def={def} element={element} override={overrides[def.key]} onChange={(v) => setValue(def, v)} />)}</div>
         </div>
       </div>
 
-      <div className="border-t border-[#e5e5e5] p-3">
-        {statusMessage && <div className={["mb-2 truncate text-[11px]", status === "error" ? "text-[#e6365a]" : "text-[#1f9d55]"].join(" ")}>{statusMessage}</div>}
-        <div className="flex gap-2">
-          <button onClick={resetAll} disabled={!hasDirty} className="flex-1 rounded-md border border-[#e5e5e5] bg-white py-2 text-[12px] text-[#606060] transition-colors hover:bg-[#fafafa] disabled:opacity-30">Discard</button>
-          <button onClick={save} disabled={!hasDirty || status === "saving" || !source} className="flex-1 rounded-md bg-[#101114] py-2 text-[12px] font-semibold text-white transition-opacity disabled:opacity-30">
+      <div style={{ borderTop: "1px solid #e5e5e5", padding: 12 }}>
+        {statusMessage && <div style={{ marginBottom: 8, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: status === "error" ? "#e6365a" : "#1f9d55" }}>{statusMessage}</div>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={resetAll} disabled={!hasDirty} className="dw-btn-secondary">Discard</button>
+          <button onClick={save} disabled={!hasDirty || status === "saving" || !source} className="dw-btn-primary">
             {status === "saving" ? "Saving…" : hasDirty ? `Save ${Object.keys(overrides).length}` : "Save"}
           </button>
         </div>
@@ -202,18 +202,18 @@ export function ElementInspector({ element, source, onDeselect }: Props) {
 
 function Section({ title, defs, element, overrides, onChange }: { title: string; defs: PropDef[]; element: Element; overrides: Overrides; onChange: (def: PropDef, value: string | null) => void }) {
   return (
-    <div className="mb-4">
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[#b3b3b3]">{title}</div>
-      <div className="flex flex-col gap-1.5">{defs.map((def) => <Row key={def.key} def={def} element={element} override={overrides[def.key]} onChange={(v) => onChange(def, v)} />)}</div>
+    <div style={{ marginBottom: 16 }}>
+      <div className="dw-section-label" style={{ marginBottom: 8 }}>{title}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{defs.map((def) => <Row key={def.key} def={def} element={element} override={overrides[def.key]} onChange={(v) => onChange(def, v)} />)}</div>
     </div>
   );
 }
 
 function LayoutSection({ element, overrides, onChange }: { element: Element; overrides: Overrides; onChange: (def: PropDef, value: string | null) => void }) {
   return (
-    <div className="mb-4">
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-[#b3b3b3]">Layout</div>
-      <div className="flex flex-col gap-2">
+    <div style={{ marginBottom: 16 }}>
+      <div className="dw-section-label" style={{ marginBottom: 8 }}>Layout</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <AxisRow axis="width" element={element} overrides={overrides} onChange={onChange} />
         <AxisRow axis="height" element={element} overrides={overrides} onChange={onChange} />
       </div>
@@ -234,15 +234,15 @@ function AxisRow({ axis, element, overrides, onChange }: { axis: "width" | "heig
   };
   return (
     <div>
-      <div className="mb-1 flex items-center justify-between">
-        <label className="font-mono text-[10px] text-[#404040]">{axis}</label>
-        <div className="flex gap-0.5">
+      <div style={{ marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <label className="dw-mono" style={{ fontSize: 10, color: "#404040" }}>{axis}</label>
+        <div style={{ display: "flex", gap: 2 }}>
           {(["fill", "hug", "fixed"] as SizingMode[]).map((m) => (
-            <button key={m} onClick={() => setMode(m)} className={["rounded px-1.5 py-0.5 font-mono text-[9px]", mode === m ? "bg-[#101114] text-white" : "bg-[#f4f4f4] text-[#606060] hover:bg-[#ebebeb]"].join(" ")}>{m}</button>
+            <button key={m} onClick={() => setMode(m)} className="dw-pill" data-active={mode === m ? "true" : "false"} style={{ padding: "2px 6px", fontSize: 9 }}>{m}</button>
           ))}
         </div>
       </div>
-      {mode === "fixed" && <SmartInput value={value} onChange={(v) => onChange(def, v)} className="w-full rounded bg-[#f4f4f4] px-1.5 py-0.5 font-mono text-[10px] text-[#101114] outline-none focus:bg-[#ebebeb]" />}
+      {mode === "fixed" && <SmartInput value={value} onChange={(v) => onChange(def, v)} className="dw-input dw-input-sm" />}
     </div>
   );
 }
@@ -252,10 +252,10 @@ function Row({ def, element, override, onChange }: { def: PropDef; element: Elem
   const value = override !== undefined ? override ?? "" : computed;
   const dirty = override !== undefined;
   return (
-    <div className={["grid grid-cols-[100px_1fr_auto] items-center gap-2 rounded px-1 py-0.5", dirty ? "bg-[#fff4f4]" : ""].join(" ")}>
-      <label className="truncate font-mono text-[10px] text-[#404040]">{def.label}</label>
-      <div className="min-w-0"><Control def={def} value={value} onChange={onChange} /></div>
-      {dirty ? <button onClick={() => onChange(null)} className="rounded px-1.5 py-0.5 text-[9px] text-[#606060] hover:bg-[#ebebeb] hover:text-[#101114]" title="reset">×</button> : <span className="w-4" />}
+    <div style={{ display: "grid", gridTemplateColumns: "100px 1fr auto", alignItems: "center", gap: 8, borderRadius: 4, background: dirty ? "#fff4f4" : "transparent", padding: "2px 4px" }}>
+      <label className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 10, color: "#404040" }}>{def.label}</label>
+      <div style={{ minWidth: 0 }}><Control def={def} value={value} onChange={onChange} /></div>
+      {dirty ? <button onClick={() => onChange(null)} className="dw-ghost" title="reset">×</button> : <span style={{ width: 16 }} />}
     </div>
   );
 }
@@ -264,22 +264,24 @@ function Control({ def, value, onChange }: { def: PropDef; value: string; onChan
   if (def.kind === "color") {
     const hex = rgbToHex(value) ?? (value.startsWith("#") ? value : "#000000");
     return (
-      <div className="flex items-center gap-1">
-        <input type="color" value={hex} onChange={(e) => onChange(e.target.value)} className="h-5 w-5 shrink-0 cursor-pointer rounded border border-[#e5e5e5] bg-white" />
-        <SmartInput plain value={value} onChange={onChange} placeholder="#hex / rgb / var()" className="w-full rounded bg-[#f4f4f4] px-1.5 py-0.5 font-mono text-[10px] text-[#101114] outline-none focus:bg-[#ebebeb]" />
+      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <input type="color" value={hex} onChange={(e) => onChange(e.target.value)} style={{ height: 20, width: 20, flexShrink: 0, cursor: "pointer", borderRadius: 4, border: "1px solid #e5e5e5", background: "white", padding: 0 }} />
+        <SmartInput plain value={value} onChange={onChange} placeholder="#hex / rgb / var()" className="dw-input dw-input-sm" />
       </div>
     );
   }
   if (def.kind === "align") {
     const opts = [{ v: "left", label: "L" }, { v: "center", label: "C" }, { v: "right", label: "R" }, { v: "justify", label: "J" }];
     return (
-      <div className="flex gap-0.5">
-        {opts.map((o) => <button key={o.v} onClick={() => onChange(o.v)} className={["h-6 w-6 rounded font-mono text-[10px]", value === o.v ? "bg-[#101114] text-white" : "bg-[#f4f4f4] text-[#606060] hover:bg-[#ebebeb]"].join(" ")}>{o.label}</button>)}
+      <div style={{ display: "flex", gap: 2 }}>
+        {opts.map((o) => (
+          <button key={o.v} onClick={() => onChange(o.v)} className="dw-pill" data-active={value === o.v ? "true" : "false"} style={{ height: 24, width: 24, padding: 0, justifyContent: "center", display: "flex", alignItems: "center" }}>{o.label}</button>
+        ))}
       </div>
     );
   }
   if (def.kind === "shadow") {
-    return <SmartInput plain value={value === "none" ? "" : value} onChange={(v) => onChange(v || "none")} placeholder="x y blur color" className="w-full rounded bg-[#f4f4f4] px-1.5 py-0.5 font-mono text-[10px] text-[#101114] outline-none focus:bg-[#ebebeb]" />;
+    return <SmartInput plain value={value === "none" ? "" : value} onChange={(v) => onChange(v || "none")} placeholder="x y blur color" className="dw-input dw-input-sm" />;
   }
-  return <SmartInput value={value} onChange={onChange} className="w-full rounded bg-[#f4f4f4] px-1.5 py-0.5 font-mono text-[10px] text-[#101114] outline-none focus:bg-[#ebebeb]" />;
+  return <SmartInput value={value} onChange={onChange} className="dw-input dw-input-sm" />;
 }
