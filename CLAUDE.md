@@ -72,6 +72,13 @@
 8. **Виділення елемента стабільне крізь HMR.** `DevWorkshopPage`
    ре-резолвить `selectedEl.element` через селектор по
    `data-devsource`, коли DOM змінюється — збережи цю поведінку.
+9. **CSS-правила тільки на `.dw-*` класах, ніколи на голих тегах.**
+   Усі компоненти користувача рендеряться як descendants
+   `[data-dev-workshop]` (всередині канвасу). Тому правило типу
+   `[data-dev-workshop] button { ... }` чи `[data-dev-workshop] * { ... }`
+   протече в його кнопки/елементи й зламає верстку. Кожен `.dw-*`
+   клас сам скидає те, що йому треба (`appearance`, `border`, `cursor`,
+   `font-family`).
 
 ## Додавання фічі
 
@@ -114,9 +121,14 @@ Decision tree:
 - **React 19** у dev (пакет користується патернами на
   `useCallback`/`useEffect`); декларований peer — `>=18`, тобто
   споживачі на 18 теж мають працювати.
-- **Tailwind 4** у проєкті-споживачі — UI workshop використовує
-  utility-класи (`fixed inset-0`, `text-[#101114]` і так далі). Без
-  Tailwind сторінка рендериться без стилів. Задокументовано у README.
+- **Стилі чрому — лише inline + власний `<style>` блок із
+  `.dw-*` класами** (див. `STYLES` константу у `DevWorkshopPage.tsx`).
+  Жодного Tailwind. Будь-яке нове правило має або жити inline у місці
+  використання, або у тому ж блоці, заскоупленому через `[data-dev-workshop]`.
+  **Жодних правил на голих тегах** (`button`, `input`, `*`, etc.) —
+  вони протекли б у компоненти користувача, які рендеряться у канвасі
+  як descendants `[data-dev-workshop]`. Кожен `.dw-*` клас має сам
+  скидати `appearance`, `border`, `cursor`, `font-family` тощо.
 - **`@babel/parser` + `@babel/types`** — це runtime-залежності
   плагіна (Node.js сторона). Тримай їх у `dependencies`, а не у
   `devDependencies`.
