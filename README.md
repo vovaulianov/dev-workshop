@@ -1,16 +1,73 @@
 # dev-workshop
 
-Embedded component explorer for Vite + React projects. Discover stories,
-inspect rendered elements, edit `style` props in source, and tweak
-design-system CSS variables — all from inside your app at `/dev`.
+Інструмент для дизайнерів і розробників, які працюють із React-проєктами
+на Vite. Він додає у твій проєкт сторінку `/dev`, на якій можна відкрити
+будь-який компонент в ізоляції, погратися з варіантами, наживо
+поредагувати стилі — і всі зміни одразу пишуться у реальні файли проєкту.
 
-## Setup
+Уяви Storybook, тільки простіший, вбудований прямо у твій застосунок,
+і з повноцінним редактором, а не лише переглядом.
+
+## Що ти отримуєш
+
+Коли заходиш на `/dev`, бачиш три панелі:
+
+**Зліва — список компонентів.** Усі компоненти, для яких є файл
+`*.stories.tsx`, з усіма їхніми варіантами. Клікаєш на варіант — він
+з'являється в центрі.
+
+**По центру — канвас.** Тут компонент рендериться так, як виглядатиме у
+застосунку. Що тут можна:
+
+- **⌘ + клік по елементу** — обвести його рамкою і відкрити інспектор
+  справа.
+- **⌥ + ховер** — побачити відстані між сусідніми елементами (як у
+  Figma при Alt-ховері).
+- **Esc** — зняти виділення.
+
+**Справа — панель з чотирма вкладками:**
+
+- **Props** — крутиш пропси компонента і одразу бачиш, як він
+  поводиться. Зручно перевіряти стани (`disabled`, `loading`, різні
+  тексти).
+- **Tokens** — список усіх `--color-*`, `--radius-*`, `--shadow-*`
+  змінних із твого `:root` блоку. Міняєш значення → одразу видно
+  ефект на компоненті. Тиснеш **Save** — зміни пишуться у твій
+  CSS-файл, а отже — і в усю дизайн-систему одразу.
+- **Code** — JSX-код того, що в канвасі. Просто прочитати/скопіювати.
+- **Element** — з'являється, коли вибрав елемент ⌘+кліком. Тут можна
+  редагувати його `style` (наприклад, додати `padding: 24px`,
+  `borderRadius: 12px`). Save — і зміна потрапляє у реальний `.tsx`
+  файл компонента, не лише у браузер.
+
+## Кому це корисно
+
+- **Дизайнерам** — заходиш на `/dev`, дивишся компонент в усіх станах,
+  крутиш токени поки не подобається, зберігаєш. Зміни одразу в коді —
+  розробнику не треба переносити вручну.
+- **Розробникам** — швидке UI-рев'ю компонентів окремо від решти
+  застосунку. І зручний спосіб побачити всі варіанти за раз під час
+  розробки.
+
+---
+
+## Як це підключити (це робить розробник, один раз)
+
+> Цей розділ — для людини, яка ставить інструмент у проєкт. Якщо ти
+> дизайнер і просто хочеш користуватися — пропусти, попроси розробника
+> налаштувати, і йди до розділу "Як написати story" або просто заходь
+> на `/dev`.
+
+### 1. Встанови пакет
 
 ```bash
-npm install dev-workshop
+npm install git+ssh://git@github.com/vovaulianov/dev-workshop.git
 ```
 
-`vite.config.ts`:
+(Або клонуй репо і встанови як локальну залежність:
+`npm install /шлях/до/клонованого/dev-workshop`.)
+
+### 2. Підключи у `vite.config.ts`
 
 ```ts
 import { defineConfig } from "vite";
@@ -25,7 +82,13 @@ export default defineConfig({
 });
 ```
 
-Mount the page (lazy-loaded, dev-only):
+`storiesGlob` — це шаблон, де шукати story-файли. За замовчуванням
+шукає у `src/**/*.stories.tsx`, тобто будь-де у `src/`.
+
+### 3. Додай сторінку у роутер
+
+Lazy-завантаження + перевірка `import.meta.env.DEV` — щоб у
+продакшен-збірку нічого не потрапило.
 
 ```tsx
 import { lazy, Suspense } from "react";
@@ -34,7 +97,7 @@ const DevWorkshop = import.meta.env.DEV
   ? lazy(() => import("dev-workshop/ui"))
   : null;
 
-// Wherever you route /dev:
+// у тому місці, де ти обробляєш роути:
 {DevWorkshop && (
   <Suspense fallback={null}>
     <DevWorkshop tokensCssFile="src/index.css" />
@@ -42,70 +105,116 @@ const DevWorkshop = import.meta.env.DEV
 )}
 ```
 
-## Story format
+`tokensCssFile` — шлях до файлу з твоїми CSS-токенами (`:root` блок).
+За замовчуванням `"src/index.css"`.
 
-Each `*.stories.tsx` file exports a default object and one or more named
-story exports:
+### 4. Запусти dev-сервер
+
+```bash
+npm run dev
+```
+
+Відкривай `http://localhost:5173/dev`. Якщо у проєкті ще немає жодного
+story-файлу — побачиш екран "No stories found". Створи перший — і
+сторінка одразу його покаже.
+
+---
+
+## Як написати story
+
+Це звичайний `.tsx` файл поряд з компонентом. Формат — стандартний
+Storybook CSF v3 (тобто все, що пишеш для Storybook, тут теж працює).
+
+`src/components/Button.stories.tsx`:
 
 ```tsx
 import { Button } from "./Button";
 
-export default { title: "ui/Button", component: Button };
+export default {
+  title: "ui/Button",
+  component: Button,
+};
 
-export const Primary = { args: { label: "Continue", variant: "primary" } };
-export const Disabled = { args: { label: "Continue", disabled: true } };
+export const Primary = {
+  args: { label: "Підтвердити", variant: "primary" },
+};
+
+export const Disabled = {
+  args: { label: "Підтвердити", disabled: true },
+};
+
+export const Loading = {
+  args: { label: "Зачекай…", loading: true },
+};
 ```
 
-Stories that match a Storybook CSF v3 file work out of the box — no
-adapter needed.
+- `title` — як компонент називатиметься у списку зліва. Слеш у назві
+  (`ui/Button`) робить категорію.
+- `component` — сам компонент, який рендеритимемо.
+- Кожен `export const` — окремий варіант. `args` — це пропси, які
+  передадуться в компонент.
 
-## Configuration
+Дизайнер потім може у вкладці **Props** ці значення міняти і
+переглядати інші стани, які ще не описані як окрема story.
 
-### `devWorkshop(options)` — Vite plugin
+---
 
-| Option | Type | Default | Description |
+## Налаштування
+
+### Опції плагіна `devWorkshop()`
+
+| Опція | Тип | За замовчуванням | Що робить |
 |---|---|---|---|
-| `storiesGlob` | `string` | `"src/**/*.stories.tsx"` | Glob for story files, resolved from project root. |
+| `storiesGlob` | `string` | `"src/**/*.stories.tsx"` | Де шукати story-файли (відносно кореня проєкту). |
 
-### `<DevWorkshop />` — React component
+### Пропси компонента `<DevWorkshop />`
 
-| Prop | Type | Default | Description |
+| Проп | Тип | За замовчуванням | Що робить |
 |---|---|---|---|
-| `tokensCssFile` | `string` | `"src/index.css"` | Path (from project root) to the CSS file containing your `:root` design-token block. The Tokens tab reads/writes this file. |
+| `tokensCssFile` | `string` | `"src/index.css"` | Шлях до CSS-файлу, у якому є `:root { --color-*: … }`. Вкладка Tokens читає і пише саме сюди. |
 
-## Requirements
+---
+
+## Що повинно бути у проєкті
 
 - **Vite** ≥ 5
-- **React** ≥ 18 (tested on 19)
-- **Tailwind CSS 4** — the workshop UI is styled with Tailwind utilities
-  (including arbitrary-value classes like `text-[#101114]`). Without
-  Tailwind 4 + preflight, the page will render unstyled.
+- **React** ≥ 18 (тестовано на 19)
+- **Tailwind CSS 4** — UI самого workshop стилізований через Tailwind.
+  Якщо у проєкті немає Tailwind 4, сторінка `/dev` рендеритиметься без
+  стилів (а от твої компоненти все одно стилізуй як хочеш — Tailwind
+  потрібен тільки для UI самого workshop).
 
-## How it works
+## Обмеження (чесно)
 
-The plugin contributes three things:
+- **Story завантажуються одразу всі при старті.** До сотні — нормально,
+  кілька тисяч — почне гальмувати запуск.
+- **Редактор `style` працює лише з простими значеннями.** Тобто
+  `color: "red"`, `padding: "24px"` — так. А от обчислені вирази або
+  spread (`...someOtherStyle`) — зберігаються, але редагувати їх з UI
+  неможна.
+- **Tokens-вкладка шукає один `:root { … }` блок** у вказаному
+  CSS-файлі. Якщо у тебе токени розкидані по кількох файлах або
+  у media-queries — їх не знайде.
 
-1. **`virtual:dev-workshop/stories`** — a virtual module that runs
-   `import.meta.glob(yourGlob, { eager: true })` in the consumer
-   project's context. The page imports stories from this module.
-2. **`data-devsource` injection** — a JSX transform that adds
-   `data-devsource="file:line:col"` to every host element so the
-   inspector can map DOM nodes back to source positions. Runs before
-   `@vitejs/plugin-react` so the attribute survives the JSX transform.
-3. **`/__dev/*` middleware** — `GET /__dev/read` and `POST /__dev/write`
-   for direct file access from the browser, plus
-   `POST /__dev/patch-style` for AST-aware edits to JSX `style` props.
-   All paths are scoped to the project root.
+---
 
-Everything is dev-server only (`apply: "serve"`) — nothing ships to
-production.
+## Як це працює всередині (для тих, кому цікаво)
 
-## Limitations
+Плагін додає три речі у твій Vite dev-сервер:
 
-- Stories are loaded eagerly at startup. A few hundred is fine; a few
-  thousand will hurt cold start.
-- The style patcher only writes to JSX `style={{ ... }}` props with
-  literal keys/values. Spreads and computed values are preserved but
-  not editable.
-- The Tokens tab assumes a single top-level `:root { ... }` block in
-  the CSS file. Nested or scoped tokens are not picked up.
+1. **Віртуальний модуль `virtual:dev-workshop/stories`** — збирає всі
+   story-файли через glob із опцій плагіна. Так workshop не залежить
+   від конкретної структури проєкту.
+2. **JSX-трансформ** — на кожен HTML-тег додається атрибут
+   `data-devsource="file:line:col"`. Через нього інспектор знає, де
+   у коді знайти елемент, по якому ти ⌘+клікнув.
+3. **API-endpoint-и** `/__dev/read`, `/__dev/write`, `/__dev/patch-style`
+   — щоб браузер міг читати і писати файли проєкту через Vite-сервер.
+   Усі шляхи валідуються, щоб не виходити за межі проєкту.
+
+Усе це активне тільки у dev-режимі. У продакшен-збірку нічого не
+потрапляє.
+
+## Ліцензія
+
+MIT
