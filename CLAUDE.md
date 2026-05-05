@@ -132,9 +132,18 @@ Decision tree:
 - **`@babel/parser` + `@babel/types`** — це runtime-залежності
   плагіна (Node.js сторона). Тримай їх у `dependencies`, а не у
   `devDependencies`.
-- **Без build-step.** Споживачі імпортують `.tsx` source напряму;
-  їхній bundler робить решту. Не додавай build pipeline, поки не
-  буде свідомого рішення публікувати у npm із компільованим виходом.
+- **Build step через `tsup`.** Source у `src/`, скомпільований вихід у
+  `dist/` (gitignored). `package.json` `exports` показують на `dist/`.
+  Споживачі ставлять `npm install github:vovaulianov/dev-workshop` —
+  npm запускає `prepare` → `npm run build` автоматично, `dist/` будується
+  на стороні споживача. Тому НЕ кради цей design рішенням закомітити
+  `dist/` "щоб уникнути prepare" — це б'є по чистоті git history. Якщо
+  тестуєш зміни локально без install, не забудь сам запустити
+  `npm run build`.
+- **Зміна `src/` без `npm run build` = stale `dist/` = невідповідний
+  імпорт у споживача.** Якщо плануєш push — переконайся, що зміни
+  скомпільовані (CI або pre-push hook був би краще; зараз — ручна
+  дисципліна).
 
 ## Як перевіряти зміни
 

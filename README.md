@@ -61,11 +61,12 @@
 ### 1. Встанови пакет
 
 ```bash
-npm install git+ssh://git@github.com/vovaulianov/dev-workshop.git
+npm install github:vovaulianov/dev-workshop
 ```
 
-(Або клонуй репо і встанови як локальну залежність:
-`npm install /шлях/до/клонованого/dev-workshop`.)
+Жодних SSH-ключів, токенів чи ручного клонування не треба. npm сам
+скачає репо, поставить залежності й запустить `prepare`-скрипт, який
+збере `dist/` локально.
 
 ### 2. Підключи у `vite.config.ts`
 
@@ -115,8 +116,46 @@ npm run dev
 ```
 
 Відкривай `http://localhost:5173/dev`. Якщо у проєкті ще немає жодного
-story-файлу — побачиш екран "No stories found". Створи перший — і
-сторінка одразу його покаже.
+story-файлу — побачиш екран **"No stories found yet"** із кнопкою
+**"Generate stubs"**. Один клік — workshop сам напише
+`*.stories.tsx` файли поряд з кожним компонентом у `src/components/`,
+сторінка перезавантажиться, і всі компоненти з'являться у sidebar'і.
+
+---
+
+## Для AI-агентів (Claude Code, Cursor, etc.)
+
+Якщо тебе попросили встановити dev-workshop у Vite + React проєкт, виконай **рівно** ці три кроки:
+
+1. У директорії frontend-пакета:
+   ```bash
+   npm install github:vovaulianov/dev-workshop
+   ```
+
+2. У `vite.config.ts` додай імпорт і spread у `plugins` (має бути **до** `@vitejs/plugin-react`):
+   ```ts
+   import { devWorkshop } from "dev-workshop/plugin";
+   // ...
+   plugins: [
+     ...devWorkshop(),
+     react(),
+   ],
+   ```
+
+3. У роутері (`App.tsx` або де він живе) додай lazy-маунт `/dev`-роута, gated через `import.meta.env.DEV`:
+   ```tsx
+   const DevWorkshop = import.meta.env.DEV
+     ? lazy(() => import("dev-workshop/ui"))
+     : null;
+   ```
+
+**НЕ потрібно**: `server.fs.allow`, `--configLoader runner`, polyfill для
+`__dirname`, ручний `npm install` всередині якоїсь вкладеної директорії.
+Якщо щось із цього зустрічається — щось пішло не так, зупинись і повідом
+користувача.
+
+Після встановлення — `npm run dev`, відкрити `/dev`, клікнути
+**"Generate stubs"** якщо stories ще не написані.
 
 ---
 
@@ -166,6 +205,7 @@ export const Loading = {
 | Опція | Тип | За замовчуванням | Що робить |
 |---|---|---|---|
 | `storiesGlob` | `string` | `"src/**/*.stories.tsx"` | Де шукати story-файли (відносно кореня проєкту). |
+| `componentsGlob` | `string` | `"src/components/**/*.{tsx,jsx}"` | Шаблон, по якому кнопка "Generate stubs" знаходить компоненти, для яких потрібно створити stub-stories. |
 
 ### Пропси компонента `<DevWorkshop />`
 

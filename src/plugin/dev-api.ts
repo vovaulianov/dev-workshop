@@ -1,6 +1,6 @@
 import type { Plugin } from "vite";
-import { readFileSync, writeFileSync } from "node:fs";
-import { resolve, relative, isAbsolute } from "node:path";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { resolve, relative, isAbsolute, basename, dirname, join } from "node:path";
 import { parse } from "@babel/parser";
 import type { ParseResult } from "@babel/parser";
 import type { File } from "@babel/types";
@@ -115,6 +115,129 @@ function patchStyle(source: string, req: PatchStyleRequest): string {
   return source.slice(0, insertPos) + ` style={${objSource}}` + source.slice(insertPos);
 }
 
+/* ─────────────── Generate stub stories ─────────────── */
+
+interface StubResult {
+  created: string[];
+  skipped: Array<{ file: string; reason: string }>;
+}
+
+/**
+ * Walks a Babel AST looking for a default export that's a React component.
+ * Returns the component name (used for the stub's `title`) or null if the
+ * file doesn't look component-shaped.
+ *
+ * Heuristic: default-exported function/arrow/identifier whose name starts
+ * with a capital letter. Doesn't try to verify JSX returns — false positives
+ * are tolerable since the "Generate stubs" flow is opt-in.
+ */
+function findDefaultExportComponent(ast: ParseResult<File>): string | null {
+  const namedDecls = new Map<string, "fn" | "var" | "class">();
+  for (const node of ast.program.body) {
+    if (node.type === "FunctionDeclaration" && node.id) namedDecls.set(node.id.name, "fn");
+    else if (node.type === "ClassDeclaration" && node.id) namedDecls.set(node.id.name, "class");
+    else if (node.type === "VariableDeclaration") {
+      for (const d of node.declarations) {
+        if (d.id.type === "Identifier") namedDecls.set(d.id.name, "var");
+      }
+    }
+  }
+  for (const node of ast.program.body) {
+    if (node.type === "ExportDefaultDeclaration") {
+      const decl = node.declaration as any;
+      if (decl?.type === "FunctionDeclaration" && decl.id?.name) {
+        if (/^[A-Z]/.test(decl.id.name)) return decl.id.name;
+      } else if (decl?.type === "ClassDeclaration" && decl.id?.name) {
+        if (/^[A-Z]/.test(decl.id.name)) return decl.id.name;
+      } else if (decl?.type === "Identifier") {
+        const name = decl.name;
+        if (/^[A-Z]/.test(name) && namedDecls.has(name)) return name;
+      } else if (decl?.type === "ArrowFunctionExpression" || decl?.type === "FunctionExpression") {
+        // Anonymous default export — fall through, we have no name to use
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Writes a `<Component>.stories.tsx` file next to a component source file,
+ * unless one already exists. Returns a status describing what happened.
+ */
+function generateStub(absComponentPath: string, projectRoot: string): { status: "created" | "skipped"; reason?: string; storyPath?: string } {
+  const dir = dirname(absComponentPath);
+  const fileName = basename(absComponentPath); // e.g., HotelCard.tsx
+  const stem = fileName.replace(/\.(tsx|jsx)$/, "");
+  if (!stem || stem === fileName) return { status: "skipped", reason: "not a tsx/jsx file" };
+
+  const storyPath = join(dir, `${stem}.stories.tsx`);
+  if (existsSync(storyPath)) return { status: "skipped", reason: "stories file already exists" };
+
+  let source: string;
+  try {
+    source = readFileSync(absComponentPath, "utf-8");
+  } catch (err) {
+    return { status: "skipped", reason: `cannot read: ${String(err)}` };
+  }
+
+  let ast: ParseResult<File>;
+  try {
+    ast = parse(source, { sourceType: "module", plugins: ["jsx", "typescript"], errorRecovery: true });
+  } catch (err) {
+    return { status: "skipped", reason: `parse error: ${String(err)}` };
+  }
+
+  const componentName = findDefaultExportComponent(ast);
+  if (!componentName) return { status: "skipped", reason: "no named default export found" };
+
+  // Build a short relative path from project root for the title category
+  const rel = relative(projectRoot, dir).split("/").filter(Boolean);
+  const category = rel.length > 0 ? rel[rel.length - 1] : "components";
+  const title = `${category}/${componentName}`;
+
+  const stub = `import ${componentName} from "./${stem}";
+
+export default {
+  title: "${title}",
+  component: ${componentName},
+};
+
+export const Default = {
+  args: {},
+};
+`;
+
+  try {
+    writeFileSync(storyPath, stub, "utf-8");
+  } catch (err) {
+    return { status: "skipped", reason: `cannot write: ${String(err)}` };
+  }
+  return { status: "created", storyPath };
+}
+
+function generateStubs(filePaths: string[], projectRoot: string): StubResult {
+  const result: StubResult = { created: [], skipped: [] };
+  for (const file of filePaths) {
+    const absPath = inRoot(projectRoot, file);
+    if (!absPath) {
+      result.skipped.push({ file, reason: "path escapes project root" });
+      continue;
+    }
+    // Skip files that are themselves stories or tests
+    if (/\.(stories|test|spec)\.(tsx|jsx)$/.test(absPath)) {
+      continue;
+    }
+    const r = generateStub(absPath, projectRoot);
+    if (r.status === "created" && r.storyPath) {
+      result.created.push(relative(projectRoot, r.storyPath));
+    } else if (r.status === "skipped") {
+      result.skipped.push({ file: relative(projectRoot, absPath), reason: r.reason ?? "unknown" });
+    }
+  }
+  return result;
+}
+
 export function devApiPlugin(): Plugin {
   return {
     name: "dev-workshop:api",
@@ -135,6 +258,22 @@ export function devApiPlugin(): Plugin {
             res.setHeader("Content-Type", "application/json; charset=utf-8");
             res.end(JSON.stringify({ content: readFileSync(absPath, "utf-8"), absPath }));
           } catch (err) { res.statusCode = 404; res.end(String(err)); }
+          return;
+        }
+
+        if (url.startsWith("/__dev/generate-stubs")) {
+          if (req.method !== "POST") { res.statusCode = 405; res.end(); return; }
+          let body = "";
+          req.on("data", (chunk) => { body += chunk; });
+          req.on("end", () => {
+            try {
+              const payload = JSON.parse(body) as { files?: string[] };
+              if (!Array.isArray(payload.files)) { res.statusCode = 400; res.end("Missing `files` array"); return; }
+              const result = generateStubs(payload.files, root);
+              res.setHeader("Content-Type", "application/json");
+              res.end(JSON.stringify(result));
+            } catch (err) { res.statusCode = 500; res.end(String(err)); }
+          });
           return;
         }
 

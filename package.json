@@ -1,20 +1,32 @@
 {
   "name": "dev-workshop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Embedded component explorer for Vite + React projects. Zero-config, stories-compatible, ships with live props editor, token tweaker, and source patcher.",
   "license": "MIT",
   "private": false,
   "type": "module",
   "files": [
-    "src",
+    "dist",
     "README.md",
     "LICENSE"
   ],
   "exports": {
-    ".": "./src/index.ts",
-    "./plugin": "./src/plugin/index.ts",
-    "./ui": "./src/ui/DevWorkshopPage.tsx",
-    "./context": "./src/context/PortalTargetContext.tsx"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin/index.d.ts",
+      "import": "./dist/plugin/index.js"
+    },
+    "./ui": {
+      "types": "./dist/ui/index.d.ts",
+      "import": "./dist/ui/index.js"
+    },
+    "./context": {
+      "types": "./dist/context/index.d.ts",
+      "import": "./dist/context/index.js"
+    }
   },
   "peerDependencies": {
     "react": ">=18",
@@ -29,9 +41,12 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "tsup": "^8.3.0",
     "typescript": "^5.9.0"
   },
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepare": "npm run build"
   }
 }

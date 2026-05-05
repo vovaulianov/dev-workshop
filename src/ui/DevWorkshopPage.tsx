@@ -5,6 +5,7 @@ import type { SelectedElement } from "./ComponentPreview";
 import { StylePanel } from "./StylePanel";
 import { buildComponentEntries } from "../lib/storyLoader";
 import type { ComponentEntry } from "../lib/storyLoader";
+import { generateStubs } from "../lib/devApi";
 
 /**
  * Stories are discovered via `virtual:dev-workshop/stories`, a virtual module
@@ -15,6 +16,7 @@ import type { ComponentEntry } from "../lib/storyLoader";
  * TypeScript declaration for this module lives in `virtual.d.ts`.
  */
 import storyModules from "virtual:dev-workshop/stories";
+import componentModules, { componentsGlob as componentsGlobPattern } from "virtual:dev-workshop/components";
 
 const componentEntries = buildComponentEntries(storyModules as Record<string, unknown>);
 
@@ -498,14 +500,7 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
     return (
       <>
         <style>{STYLES}</style>
-        <div data-dev-workshop style={{ position: "fixed", inset: 0, zIndex: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#F4F4F4", color: "#101114" }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 18, fontWeight: 600 }}>No stories found</div>
-            <div style={{ marginTop: 8, fontSize: 14, color: "#808080" }}>
-              Create a <code>*.stories.tsx</code> file under <code>src/components/</code>
-            </div>
-          </div>
-        </div>
+        <NoStoriesState />
       </>
     );
   }
@@ -547,6 +542,79 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
             tab={tab}
             onTabChange={setTab}
           />
+        </div>
+      </div>
+    </>
+  );
+}
+
+/**
+ * Empty state shown when no `*.stories.tsx` files were found by the
+ * `storiesGlob`. Offers a one-click "Generate stubs" action that walks
+ * the consumer's `componentsGlob` and writes stub stories next to each
+ * default-exported component. After a successful run we reload — Vite
+ * picks up the new files and the workshop fills with components.
+ */
+function NoStoriesState() {
+  type Status = "idle" | "running" | "done" | "error";
+  const [status, setStatus] = useState<Status>("idle");
+  const [message, setMessage] = useState<string>("");
+
+  const componentFiles = Object.keys(componentModules);
+  const hasComponents = componentFiles.length > 0;
+
+  const onGenerate = useCallback(async () => {
+    setStatus("running");
+    setMessage(`Scanning ${componentFiles.length} files…`);
+    try {
+      const result = await generateStubs(componentFiles);
+      const skippedExisting = result.skipped.filter((s) => s.reason === "stories file already exists").length;
+      const skippedOther = result.skipped.length - skippedExisting;
+      const parts = [
+        `Created ${result.created.length} stub${result.created.length === 1 ? "" : "s"}.`,
+        skippedExisting ? `${skippedExisting} already had stories.` : null,
+        skippedOther ? `${skippedOther} skipped (no default-exported component).` : null,
+      ].filter(Boolean);
+      setStatus("done");
+      setMessage(parts.join(" "));
+      if (result.created.length > 0) {
+        setTimeout(() => window.location.reload(), 800);
+      }
+    } catch (err) {
+      setStatus("error");
+      setMessage(err instanceof Error ? err.message : String(err));
+    }
+  }, [componentFiles]);
+
+  return (
+    <>
+      <div data-dev-workshop style={{ position: "fixed", inset: 0, zIndex: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#F4F4F4", color: "#101114" }}>
+        <div style={{ textAlign: "center", maxWidth: 460, padding: 24 }}>
+          <div style={{ fontSize: 22, fontWeight: 600 }}>No stories found yet</div>
+          <div style={{ marginTop: 8, fontSize: 14, color: "#606060", lineHeight: 1.5 }}>
+            Stories are <code className="dw-mono">*.stories.tsx</code> files placed next to your components.
+            {hasComponents
+              ? <> We found <strong>{componentFiles.length}</strong> component file{componentFiles.length === 1 ? "" : "s"} matching <code className="dw-mono">{componentsGlobPattern}</code>. Generate stub stories for them and you'll be up and running in a second.</>
+              : <> No component files match <code className="dw-mono">{componentsGlobPattern}</code> — adjust the <code className="dw-mono">componentsGlob</code> plugin option, or write a stories file by hand. See the README for the format.</>
+            }
+          </div>
+
+          {hasComponents && (
+            <button
+              onClick={onGenerate}
+              disabled={status === "running" || status === "done"}
+              className="dw-btn-primary"
+              style={{ marginTop: 20, width: "auto", padding: "10px 18px", fontSize: 13 }}
+            >
+              {status === "running" ? "Generating…" : status === "done" ? "Reloading…" : "Generate stubs from " + componentsGlobPattern}
+            </button>
+          )}
+
+          {message && (
+            <div style={{ marginTop: 14, fontSize: 12, color: status === "error" ? "#e6365a" : "#1f9d55", lineHeight: 1.5 }}>
+              {message}
+            </div>
+          )}
         </div>
       </div>
     </>

@@ -44,6 +44,26 @@ export async function patchStyle(args: {
   return res.json();
 }
 
+export interface GenerateStubsResponse {
+  created: string[];
+  skipped: Array<{ file: string; reason: string }>;
+}
+
+/** Walks the supplied component file paths and writes a `<Component>.stories.tsx`
+ *  next to each one (skipping files that already have stories). The server
+ *  parses each component for a default export to derive the story title. */
+export async function generateStubs(files: string[]): Promise<GenerateStubsResponse> {
+  const res = await fetch("/__dev/generate-stubs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ files }),
+  });
+  if (!res.ok) {
+    throw new Error(`generate-stubs failed: ${res.status} ${await res.text()}`);
+  }
+  return res.json();
+}
+
 export interface TokenInfo {
   name: string;
   value: string;
