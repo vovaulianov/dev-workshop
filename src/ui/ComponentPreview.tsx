@@ -1,35 +1,14 @@
-import { Component, createElement, useEffect, useMemo, useRef, useState } from "react";
-import type { ComponentType, ErrorInfo, ReactNode } from "react";
-import type { ComponentEntry, StoryVariant } from "../lib/storyLoader";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ComponentEntry } from "../lib/storyLoader";
 import { SelectionOverlay } from "./SelectionOverlay";
 import { DistanceLayer } from "./DistanceLayer";
 import { sourceForElement } from "../lib/fiberUtils";
 import type { ElementSource } from "../lib/fiberUtils";
 import { PortalTargetProvider } from "../context/PortalTargetContext";
-
-/** Catches errors from the user's component so a single broken story
- *  (e.g. a stub with empty args missing a required prop) doesn't tear
- *  down the whole workshop. */
-class CanvasErrorBoundary extends Component<{ children: ReactNode; resetKey: string }, { error: Error | null }> {
-  state = { error: null as Error | null };
-  static getDerivedStateFromError(error: Error) { return { error }; }
-  componentDidUpdate(prev: { resetKey: string }) {
-    if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
-  }
-  componentDidCatch(_e: Error, _info: ErrorInfo) { /* swallow — message shown in fallback */ }
-  render() {
-    if (this.state.error) {
-      return (
-        <div style={{ padding: 24, fontFamily: "var(--dw-font-mono)", fontSize: 12, color: "#dc2626", background: "#fff4f4", borderRadius: 8, maxWidth: 480, margin: "24px auto", whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
-          <div style={{ fontFamily: "var(--dw-font)", fontWeight: 600, marginBottom: 8 }}>Render error</div>
-          {this.state.error.message}
-          <div style={{ marginTop: 12, fontFamily: "var(--dw-font)", fontSize: 11, color: "#808080" }}>Stub stories use empty args; this component likely needs required props. Edit the stories file to add them.</div>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+import { renderVariant } from "../lib/renderVariant";
+import { CanvasErrorBoundary } from "./CanvasErrorBoundary";
+import { CanvasStage } from "./CanvasStage";
+import type { UseCanvasState } from "../lib/useCanvasState";
 
 export interface SelectedElement {
   element: Element;
@@ -44,40 +23,31 @@ interface Props {
   selected: SelectedElement | null;
   onSelectElement: (next: SelectedElement | null) => void;
   hideSelectionOutline?: boolean;
-  /** When true (Element tab is active), regular click selects an element
-   *  on the canvas without needing ⌘. Hover also highlights without modifier. */
+  /** When true (Element tab is active), the workspace becomes a Figma-like
+   *  canvas (pan/zoom + multi-frame). Outside Element tab, falls back to the
+   *  legacy single-canvas stage with click-to-select gated by ⌘. */
   inspectMode?: boolean;
+  /** Canvas state — only consulted when `inspectMode` is true. */
+  canvas?: UseCanvasState;
 }
-
-type AnyArgs = Record<string, unknown>;
-type Decorator = (Story: ComponentType, context?: unknown) => ReactNode;
 
 const WIDTH_PRESETS = [320, 390, 430, 768, 1024];
 type Width = number | "full";
 
-function renderVariant(entry: ComponentEntry, variant: StoryVariant, argsOverride: AnyArgs): ReactNode {
-  const mergedArgs: AnyArgs = { ...(variant.args as AnyArgs), ...argsOverride };
-  const baseRender = variant.render
-    ? () => variant.render!(mergedArgs, { args: mergedArgs })
-    : () => createElement(entry.component, mergedArgs);
-
-  const decorators: Decorator[] = [...(entry.metaDecorators ?? []), ...(variant.decorators ?? [])];
-  if (decorators.length === 0) return baseRender();
-
-  let storyFn: () => ReactNode = baseRender;
-  for (const decorator of [...decorators].reverse()) {
-    const prev = storyFn;
-    const StoryComponent: ComponentType = () => prev() as ReactNode;
-    storyFn = () => decorator(StoryComponent, { args: variant.args });
-  }
-  return storyFn();
-}
-
-export function ComponentPreview({ entry, variantIndex, argsOverride, selected, onSelectElement, hideSelectionOutline, inspectMode = false }: Props) {
+export function ComponentPreview({
+  entry,
+  variantIndex,
+  argsOverride,
+  selected,
+  onSelectElement,
+  hideSelectionOutline,
+  inspectMode = false,
+  canvas,
+}: Props) {
   const variant = entry.variants[variantIndex] ?? entry.variants[0]!;
   const [width, setWidth] = useState<Width>(430);
   const stageRef = useRef<HTMLDivElement>(null);
-  const [canvas, setCanvas] = useState<HTMLDivElement | null>(null);
+  const [legacyCanvas, setLegacyCanvas] = useState<HTMLDivElement | null>(null);
   const [hovered, setHovered] = useState<Element | null>(null);
   const [metaHeld, setMetaHeld] = useState(false);
   const [altHeld, setAltHeld] = useState(false);
@@ -86,13 +56,25 @@ export function ComponentPreview({ entry, variantIndex, argsOverride, selected, 
     try {
       return renderVariant(entry, variant, argsOverride ?? {});
     } catch (err) {
-      return <div style={{ padding: 16, fontSize: 13, color: "#dc2626" }}>Render error: {String(err)}</div>;
+      return (
+        <div style={{ padding: 16, fontSize: 13, color: "#dc2626" }}>
+          Render error: {String(err)}
+        </div>
+      );
     }
   }, [entry, variant, argsOverride]);
 
+  // Modifier-key tracking — kept on the legacy stage; CanvasStage tracks its
+  // own (Space/Cmd/Alt for pan/zoom/distance).
   useEffect(() => {
-    const sync = (e: KeyboardEvent | MouseEvent) => { setMetaHeld(e.metaKey || e.ctrlKey); setAltHeld(e.altKey); };
-    const blur = () => { setMetaHeld(false); setAltHeld(false); };
+    const sync = (e: KeyboardEvent | MouseEvent) => {
+      setMetaHeld(e.metaKey || e.ctrlKey);
+      setAltHeld(e.altKey);
+    };
+    const blur = () => {
+      setMetaHeld(false);
+      setAltHeld(false);
+    };
     window.addEventListener("keydown", sync);
     window.addEventListener("keyup", sync);
     window.addEventListener("mousemove", sync);
@@ -105,67 +87,151 @@ export function ComponentPreview({ entry, variantIndex, argsOverride, selected, 
     };
   }, []);
 
+  // Legacy canvas click/hover handlers — only active when NOT in inspectMode.
   useEffect(() => {
-    if (!canvas) return;
+    if (inspectMode) return; // CanvasStage handles its own events
+    if (!legacyCanvas) return;
     const onClick = (e: MouseEvent) => {
-      if (!inspectMode && !(e.metaKey || e.ctrlKey)) return;
+      if (!(e.metaKey || e.ctrlKey)) return;
       const target = e.target as Element | null;
-      if (!target || !canvas.contains(target)) return;
+      if (!target || !legacyCanvas.contains(target)) return;
       e.preventDefault();
       e.stopPropagation();
       onSelectElement({ element: target, source: sourceForElement(target) });
     };
     const onMove = (e: MouseEvent) => {
-      const active = inspectMode || (e.metaKey || e.ctrlKey) || e.altKey;
-      if (!active) { setHovered(null); return; }
+      const active = (e.metaKey || e.ctrlKey) || e.altKey;
+      if (!active) {
+        setHovered(null);
+        return;
+      }
       const t = e.target as Element | null;
-      if (t && canvas.contains(t)) setHovered(t);
+      if (t && legacyCanvas.contains(t)) setHovered(t);
     };
     const onLeave = () => setHovered(null);
-    canvas.addEventListener("click", onClick, true);
-    canvas.addEventListener("mousemove", onMove);
-    canvas.addEventListener("mouseleave", onLeave);
+    legacyCanvas.addEventListener("click", onClick, true);
+    legacyCanvas.addEventListener("mousemove", onMove);
+    legacyCanvas.addEventListener("mouseleave", onLeave);
     return () => {
-      canvas.removeEventListener("click", onClick, true);
-      canvas.removeEventListener("mousemove", onMove);
-      canvas.removeEventListener("mouseleave", onLeave);
+      legacyCanvas.removeEventListener("click", onClick, true);
+      legacyCanvas.removeEventListener("mousemove", onMove);
+      legacyCanvas.removeEventListener("mouseleave", onLeave);
     };
-  }, [canvas, onSelectElement, inspectMode]);
+  }, [legacyCanvas, onSelectElement, inspectMode]);
 
-  useEffect(() => { if (!inspectMode && !metaHeld && !altHeld) setHovered(null); }, [metaHeld, altHeld, inspectMode]);
+  useEffect(() => {
+    if (!metaHeld && !altHeld) setHovered(null);
+  }, [metaHeld, altHeld]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { onSelectElement(null); setHovered(null); }, [entry.id, variantIndex]);
+  useEffect(() => {
+    onSelectElement(null);
+    setHovered(null);
+  }, [entry.id, variantIndex]);
 
-  const startDrag = (e: React.MouseEvent) => {
-    e.preventDefault();
-    if (width === "full") return;
-    const startX = e.clientX;
-    const startWidth = width;
-    const onMove = (ev: MouseEvent) => setWidth(Math.round(Math.max(120, Math.min(2000, startWidth + (ev.clientX - startX) * 2))));
-    const onUp = () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-  };
+  const startDrag = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (width === "full") return;
+      const startX = e.clientX;
+      const startWidth = width;
+      const onMove = (ev: MouseEvent) =>
+        setWidth(
+          Math.round(Math.max(120, Math.min(2000, startWidth + (ev.clientX - startX) * 2))),
+        );
+      const onUp = () => {
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
+    [width],
+  );
 
   const widthLabel = width === "full" ? "full" : `${width}px`;
 
+  const hint = inspectMode ? (
+    <>
+      <kbd className="dw-kbd">space</kbd> + drag to pan ·{" "}
+      <kbd className="dw-kbd">⌘</kbd>+wheel zoom · click element to select ·{" "}
+      <kbd className="dw-kbd">⌥</kbd> for spacing
+    </>
+  ) : (
+    <>
+      {" "}
+      <kbd className="dw-kbd">⌘</kbd> + click or Element tab to select ·{" "}
+      <kbd className="dw-kbd">⌥</kbd> for spacing · <kbd className="dw-kbd">esc</kbd> hides outline
+    </>
+  );
+
   return (
-    <section style={{ display: "flex", height: "100%", flex: 1, flexDirection: "column", background: "transparent", color: "#101114", minWidth: 0, gap: 8 }}>
+    <section
+      style={{
+        display: "flex",
+        height: "100%",
+        flex: 1,
+        flexDirection: "column",
+        background: "transparent",
+        color: "#101114",
+        minWidth: 0,
+        gap: 8,
+      }}
+    >
       <div className="dw-card" style={{ flexShrink: 0 }}>
-        <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "12px 16px" }}>
+        <header
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            padding: "12px 16px",
+          }}
+        >
           <div style={{ display: "flex", minWidth: 0, alignItems: "baseline", gap: 12 }}>
-            <h1 style={{ flexShrink: 0, fontSize: 15, fontWeight: 600, color: "#101114", margin: 0 }}>{entry.name}</h1>
+            <h1 style={{ flexShrink: 0, fontSize: 15, fontWeight: 600, color: "#101114", margin: 0 }}>
+              {entry.name}
+            </h1>
             {entry.variants[variantIndex] && entry.variants.length > 1 && (
-              <div style={{ flexShrink: 0, borderRadius: 999, background: "#f4f4f4", padding: "2px 8px", fontSize: 11, color: "#606060" }}>{entry.variants[variantIndex]!.name}</div>
+              <div
+                style={{
+                  flexShrink: 0,
+                  borderRadius: 999,
+                  background: "#f4f4f4",
+                  padding: "2px 8px",
+                  fontSize: 11,
+                  color: "#606060",
+                }}
+              >
+                {entry.variants[variantIndex]!.name}
+              </div>
             )}
-            <div className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "#b3b3b3" }}>{entry.sourceFile}</div>
+            <div
+              className="dw-mono"
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                fontSize: 11,
+                color: "#b3b3b3",
+              }}
+            >
+              {entry.sourceFile}
+            </div>
           </div>
           <div className="dw-mono" style={{ fontSize: 10, color: "#b3b3b3", flexShrink: 0 }}>
-            {" "}<kbd className="dw-kbd">⌘</kbd> + click or Element tab to select · <kbd className="dw-kbd">⌥</kbd> for spacing · <kbd className="dw-kbd">esc</kbd> hides outline
+            {hint}
           </div>
         </header>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 8, borderTop: "1px solid #f1f1f1", padding: "8px 16px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            borderTop: "1px solid #f1f1f1",
+            padding: "8px 16px",
+          }}
+        >
           <div className="dw-section-label">Width</div>
           <div className="dw-segments" style={{ flexShrink: 0 }}>
             {WIDTH_PRESETS.map((w) => (
@@ -192,62 +258,86 @@ export function ComponentPreview({ entry, variantIndex, argsOverride, selected, 
             <input
               type="number"
               value={width === "full" ? "" : width}
-              onChange={(e) => { const v = Number(e.target.value); if (!Number.isNaN(v) && v > 0) setWidth(v); }}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (!Number.isNaN(v) && v > 0) setWidth(v);
+              }}
               placeholder="custom"
               className="dw-input-md"
               style={{ width: 80 }}
             />
           </div>
-          <div className="dw-mono" style={{ marginLeft: "auto", fontSize: 11, color: "#b3b3b3" }}>{widthLabel}</div>
+          <div className="dw-mono" style={{ marginLeft: "auto", fontSize: 11, color: "#b3b3b3" }}>
+            {widthLabel}
+          </div>
         </div>
       </div>
 
-      <div
-        ref={stageRef}
-        style={{
-          display: "flex",
-          flex: 1,
-          minHeight: 0,
-          alignItems: "flex-start",
-          justifyContent: "center",
-          overflow: "auto",
-          background: "transparent",
-          padding: "8px 4px",
-          ...((metaHeld || inspectMode) ? { cursor: "crosshair" } : null),
-        }}
-      >
+      {inspectMode && canvas ? (
+        <CanvasStage
+          entry={entry}
+          argsOverride={argsOverride ?? {}}
+          canvas={canvas}
+          width={width}
+          onSelectElement={onSelectElement}
+        />
+      ) : (
         <div
-          ref={setCanvas}
+          ref={stageRef}
           style={{
-            position: "relative",
-            flexShrink: 0,
-            color: "#101114",
-            ...(width === "full" ? { width: "100%", minHeight: "100%" } : { width: `${width}px`, minHeight: "100%" }),
-            transform: "translateZ(0)",
+            display: "flex",
+            flex: 1,
+            minHeight: 0,
+            alignItems: "flex-start",
+            justifyContent: "center",
+            overflow: "auto",
+            background: "transparent",
+            padding: "8px 4px",
+            ...(metaHeld ? { cursor: "crosshair" } : null),
           }}
         >
-          <PortalTargetProvider target={canvas}>
-            <CanvasErrorBoundary resetKey={`${entry.id}:${variantIndex}`}>
-              {rendered}
-            </CanvasErrorBoundary>
-          </PortalTargetProvider>
-          {width !== "full" && (
-            <div
-              onMouseDown={startDrag}
-              title="Drag to resize"
-              style={{ position: "absolute", top: 0, right: -12, height: "100%", width: 12, cursor: "ew-resize" }}
+          <div
+            ref={setLegacyCanvas}
+            style={{
+              position: "relative",
+              flexShrink: 0,
+              color: "#101114",
+              ...(width === "full"
+                ? { width: "100%", minHeight: "100%" }
+                : { width: `${width}px`, minHeight: "100%" }),
+              transform: "translateZ(0)",
+            }}
+          >
+            <PortalTargetProvider target={legacyCanvas}>
+              <CanvasErrorBoundary resetKey={`${entry.id}:${variantIndex}`}>
+                {rendered}
+              </CanvasErrorBoundary>
+            </PortalTargetProvider>
+            {width !== "full" && (
+              <div
+                onMouseDown={startDrag}
+                title="Drag to resize"
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  right: -12,
+                  height: "100%",
+                  width: 12,
+                  cursor: "ew-resize",
+                }}
+              />
+            )}
+            <SelectionOverlay
+              stage={legacyCanvas}
+              hovered={metaHeld ? hovered : null}
+              selected={hideSelectionOutline ? null : selected?.element ?? null}
             />
-          )}
-          <SelectionOverlay
-            stage={canvas}
-            hovered={(metaHeld || inspectMode) ? hovered : null}
-            selected={hideSelectionOutline ? null : (selected?.element ?? null)}
-          />
-          {selected?.element && altHeld && hovered && hovered !== selected.element && (
-            <DistanceLayer stage={canvas} from={selected.element} to={hovered} />
-          )}
+            {selected?.element && altHeld && hovered && hovered !== selected.element && (
+              <DistanceLayer stage={legacyCanvas} from={selected.element} to={hovered} />
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }

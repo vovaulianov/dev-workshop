@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ComponentSidebar } from "./ComponentSidebar";
 import { ComponentPreview } from "./ComponentPreview";
 import type { SelectedElement } from "./ComponentPreview";
@@ -7,6 +7,7 @@ import { buildComponentEntries } from "../lib/storyLoader";
 import type { ComponentEntry } from "../lib/storyLoader";
 import { generateStubs } from "../lib/devApi";
 import { isUndoRedoKey, useHistory } from "../lib/useHistory";
+import { useCanvasState, sourceToLoc } from "../lib/useCanvasState";
 
 /**
  * Stories are discovered via `virtual:dev-workshop/stories`, a virtual module
@@ -646,6 +647,13 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
   const [outlineHidden, setOutlineHidden] = useState(false);
   const [tab, setTab] = useState<Tab>("props");
 
+  // Per-component canvas state (frames, overrides, pan/zoom, selection).
+  // Phase 1 always has 1 frame; Phase 2+ adds Cmd+D duplication. The hook
+  // auto-resets when componentId changes.
+  const componentId = selected?.id ?? "__none__";
+  const canvas = useCanvasState(componentId, variantIndex);
+  const { undo: canvasUndo, redo: canvasRedo, applyOverride, clearOverridesForLoc, setSelection: setCanvasSelection, activeFrame } = canvas;
+
   // Cmd+Z / Cmd+Shift+Z while Props tab is active → undo/redo args overrides.
   useEffect(() => {
     if (tab !== "props") return;
@@ -660,6 +668,20 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
     return () => window.removeEventListener("keydown", onKey);
   }, [tab, argsOverrideH]);
 
+  // Cmd+Z / Cmd+Shift+Z while Element tab is active → undo/redo canvas state.
+  useEffect(() => {
+    if (tab !== "element") return;
+    const onKey = (e: KeyboardEvent) => {
+      const action = isUndoRedoKey(e);
+      if (!action) return;
+      e.preventDefault();
+      if (action === "undo") canvasUndo();
+      else canvasRedo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tab, canvasUndo, canvasRedo]);
+
   const [sidebarWidth, setSidebarWidth] = useState(() => readLSNumber(LS_SIDEBAR, 240));
   const [panelWidth, setPanelWidth] = useState(() => readLSNumber(LS_PANEL, 360));
 
@@ -673,6 +695,7 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
     argsOverrideH.reset({});
     setSelectedEl(null);
     setOutlineHidden(false);
+    // Canvas state auto-resets via useCanvasState's effect on componentId change.
   }, [argsOverrideH]);
 
   const handleVariantChange = useCallback((i: number) => {
@@ -681,7 +704,42 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
     argsOverrideH.reset({});
     setSelectedEl(null);
     setOutlineHidden(false);
+    // Phase 1 limitation: switching variants while in Element tab keeps the
+    // canvas frame (with possibly-stale overrides). User can hit "Discard"
+    // in inspector or use "Reset view" to clear.
   }, [argsOverrideH]);
+
+  // Selection deselect — clears both the live element ref and canvasState's
+  // sourceLoc so the inspector goes back to empty state.
+  const handleDeselectElement = useCallback(() => {
+    setSelectedEl(null);
+    setCanvasSelection({ frameId: activeFrame.id, sourceLoc: null });
+  }, [setCanvasSelection, activeFrame.id]);
+
+  // Inspector wiring: derive currentLoc from selectedEl, expose overrides
+  // and per-prop change callback that writes into canvas.activeFrame.overrides.
+  const currentLoc = useMemo(() => {
+    if (!selectedEl?.source) return null;
+    return sourceToLoc(selectedEl.source);
+  }, [selectedEl?.source]);
+
+  const inspectorOverrides = useMemo(() => {
+    if (!currentLoc) return {};
+    return activeFrame.overrides[currentLoc] ?? {};
+  }, [currentLoc, activeFrame.overrides]);
+
+  const handleInspectorChange = useCallback(
+    (cssProp: string, value: string | null) => {
+      if (!currentLoc) return;
+      applyOverride(activeFrame.id, currentLoc, cssProp, value);
+    },
+    [applyOverride, activeFrame.id, currentLoc],
+  );
+
+  const handleInspectorDiscard = useCallback(() => {
+    if (!currentLoc) return;
+    clearOverridesForLoc(activeFrame.id, currentLoc);
+  }, [clearOverridesForLoc, activeFrame.id, currentLoc]);
 
   // Auto-switch to Element tab when something is selected via canvas click
   useEffect(() => {
@@ -772,6 +830,7 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
           onSelectElement={setSelectedEl}
           hideSelectionOutline={outlineHidden}
           inspectMode={inspectMode}
+          canvas={canvas}
         />
         <button className="dw-resize" onMouseDown={startResize("panel")} title="Drag to resize" aria-label="resize panel" />
         <div style={{ width: panelWidth, display: "flex", height: "100%", flexShrink: 0 }}>
@@ -781,10 +840,13 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
             argsOverride={argsOverride}
             onArgsOverrideChange={setArgsOverride}
             selectedElement={selectedEl}
-            onDeselectElement={() => setSelectedEl(null)}
+            onDeselectElement={handleDeselectElement}
             tokensCssFile={tokensCssFile}
             tab={tab}
             onTabChange={setTab}
+            inspectorOverrides={inspectorOverrides}
+            onInspectorChange={handleInspectorChange}
+            onInspectorDiscard={handleInspectorDiscard}
           />
         </div>
       </div>

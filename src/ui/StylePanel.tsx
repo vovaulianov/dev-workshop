@@ -15,6 +15,7 @@ import { inferPropDescriptors, type PropDescriptor } from "../lib/propsInference
 import { isUndoRedoKey, useHistory } from "../lib/useHistory";
 import { ElementInspector } from "./ElementInspector";
 import type { SelectedElement } from "./ComponentPreview";
+import type { StyleOverride } from "../lib/useCanvasState";
 
 export type Tab = "props" | "tokens" | "code" | "element";
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -33,6 +34,13 @@ interface Props {
    *  `tab === "element"` and switch into inspect mode. */
   tab: Tab;
   onTabChange: (next: Tab) => void;
+  /** Per-frame style overrides for the currently-selected source location.
+   *  Keys are kebab-case CSS properties. Empty object when nothing is selected. */
+  inspectorOverrides: StyleOverride;
+  /** Update one CSS property in the active frame's overrides for the selected loc. */
+  onInspectorChange: (cssProp: string, value: string | null) => void;
+  /** Drop ALL overrides for the selected loc. */
+  onInspectorDiscard: () => void;
 }
 
 export function StylePanel({
@@ -45,6 +53,9 @@ export function StylePanel({
   tokensCssFile = "src/index.css",
   tab,
   onTabChange,
+  inspectorOverrides,
+  onInspectorChange,
+  onInspectorDiscard,
 }: Props) {
   return (
     <aside className="dw-card" style={{ display: "flex", height: "100%", minWidth: 0, flex: 1, flexDirection: "column", color: "#101114" }}>
@@ -64,6 +75,9 @@ export function StylePanel({
             element={selectedElement.element}
             source={selectedElement.source}
             onDeselect={onDeselectElement}
+            overrides={inspectorOverrides}
+            onChange={onInspectorChange}
+            onDiscard={onInspectorDiscard}
           />
         ) : (
           <ElementEmptyState />
