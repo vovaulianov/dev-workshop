@@ -219,7 +219,13 @@ export const Default = {
 function generateStubs(filePaths: string[], projectRoot: string): StubResult {
   const result: StubResult = { created: [], skipped: [] };
   for (const file of filePaths) {
-    const absPath = inRoot(projectRoot, file);
+    // Vite's `import.meta.glob` returns paths with a leading `/` that mean
+    // "project-root-relative", not filesystem-absolute. Normalize before
+    // `inRoot` so we don't end up reading from `/src/...` on the real fs.
+    const normalized = file.startsWith("/") && !file.startsWith("//")
+      ? file.slice(1)
+      : file;
+    const absPath = inRoot(projectRoot, normalized);
     if (!absPath) {
       result.skipped.push({ file, reason: "path escapes project root" });
       continue;
