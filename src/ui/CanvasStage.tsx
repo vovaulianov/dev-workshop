@@ -49,6 +49,19 @@ export function CanvasStage({ entry, argsOverride, canvas, width, onSelectElemen
     [applyOverride, state.activeFrameId, state.selection.sourceLoc],
   );
 
+  // Live body-drag callback. Writes `transform: translate(...)` so the
+  // element shifts visually without breaking parent layout (no absolute
+  // positioning required). Subsequent drags accumulate (DragHandle reads
+  // the current transform from getComputedStyle on each pointerdown).
+  const onMoveSelected = useCallback(
+    (transform: string) => {
+      const loc = state.selection.sourceLoc;
+      if (!loc) return;
+      applyOverride(state.activeFrameId, loc, "transform", transform);
+    },
+    [applyOverride, state.activeFrameId, state.selection.sourceLoc],
+  );
+
   // Modifier-key tracking — for Distance layer (⌥) and Space-pan.
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
@@ -234,6 +247,7 @@ export function CanvasStage({ entry, argsOverride, canvas, width, onSelectElemen
               width={width}
               onActivate={() => setActiveFrame(f.id)}
               onResizeSelected={onResizeSelected}
+              onMoveSelected={onMoveSelected}
             />
           ))}
         </div>

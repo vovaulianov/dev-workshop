@@ -36,6 +36,10 @@ interface Props {
   /** Live resize callback fired during a handle drag. CanvasStage routes
    *  this into the active frame's overrides as `width`/`height`. */
   onResizeSelected?: (next: { width: number; height: number }) => void;
+  /** Live body-drag callback fired during a translate gesture. CanvasStage
+   *  routes the resulting transform string into the active frame's
+   *  overrides as `transform`. */
+  onMoveSelected?: (transform: string) => void;
 }
 
 /**
@@ -55,6 +59,7 @@ export function Frame({
   width,
   onActivate,
   onResizeSelected,
+  onMoveSelected,
 }: Props) {
   const [canvas, setCanvas] = useState<HTMLDivElement | null>(null);
   const [hovered, setHovered] = useState<Element | null>(null);
@@ -236,6 +241,7 @@ export function Frame({
             hovered={hovered && hovered !== selectedElement ? hovered : null}
             selected={selectedElement}
             onResize={selectedElement ? onResizeSelected : undefined}
+            onMove={selectedElement ? onMoveSelected : undefined}
           />
         )}
         {isActive && altHeld && selectedElement && hovered && hovered !== selectedElement && (
