@@ -141,6 +141,69 @@ export function readAllTokens(): TokenInfo[] {
   return tokens;
 }
 
+export interface TextStyle {
+  /** The class name without the leading dot (e.g. `text-h1`). */
+  className: string;
+  /** Friendly label — `text-h1` becomes `h1`. */
+  name: string;
+  /** Sorted map of CSS declarations defined inside the rule. */
+  declarations: Record<string, string>;
+}
+
+const TEXT_STYLE_FONT_PROPS = [
+  "font-size",
+  "font-weight",
+  "line-height",
+  "letter-spacing",
+  "font-family",
+  "text-transform",
+];
+
+/**
+ * Walks the document's style sheets for plain `.text-*` class rules. Filters
+ * out single-property Tailwind-style utilities (like `.text-red-500`,
+ * `.text-sm`, `.text-center`) by requiring (a) at least two declarations
+ * AND (b) at least one font-related declaration.
+ *
+ * Returns a deduplicated, sorted list — the first definition of a class wins.
+ */
+export function readAllTextStyles(): TextStyle[] {
+  const seen = new Map<string, TextStyle>();
+
+  for (const sheet of Array.from(document.styleSheets)) {
+    let rules: CSSRuleList | null = null;
+    try { rules = sheet.cssRules; } catch { continue; }
+    if (!rules) continue;
+
+    for (const rule of Array.from(rules)) {
+      if (!(rule instanceof CSSStyleRule)) continue;
+      const sel = rule.selectorText;
+      // Only simple class selectors of the form `.text-foo`.
+      if (!/^\.text-[a-zA-Z0-9_-]+$/.test(sel)) continue;
+      const className = sel.slice(1);
+      if (seen.has(className)) continue;
+
+      const declarations: Record<string, string> = {};
+      for (let i = 0; i < rule.style.length; i++) {
+        const prop = rule.style.item(i);
+        declarations[prop] = rule.style.getPropertyValue(prop).trim();
+      }
+
+      const propCount = Object.keys(declarations).length;
+      const hasFont = TEXT_STYLE_FONT_PROPS.some((p) => p in declarations);
+      if (propCount < 2 || !hasFont) continue;
+
+      seen.set(className, {
+        className,
+        name: className.replace(/^text-/, ""),
+        declarations,
+      });
+    }
+  }
+
+  return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export function applyTokenOverride(name: string, value: string) {
   document.documentElement.style.setProperty(name, value);
 }

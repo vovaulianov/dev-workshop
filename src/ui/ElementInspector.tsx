@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { patchStyle } from "../lib/devApi";
+import { patchStyle, readAllTextStyles, type TextStyle } from "../lib/devApi";
 import type { ElementSource } from "../lib/fiberUtils";
 import { describeElement } from "../lib/fiberUtils";
+import { isUndoRedoKey, useHistory } from "../lib/useHistory";
 import { SmartInput } from "./SmartInput";
 import { Slider } from "./Slider";
 
@@ -74,6 +75,7 @@ const SPACING_SIZE: PropDef[] = [
   { key: "borderRadius", cssProp: "border-radius", label: "border-radius", kind: "size" },
 ];
 const COLORS: PropDef[] = [
+  { key: "opacity", cssProp: "opacity", label: "opacity", kind: "text" },
   { key: "color", cssProp: "color", label: "color", kind: "color" },
   { key: "backgroundColor", cssProp: "background-color", label: "background", kind: "color" },
 ];
@@ -91,7 +93,6 @@ const BORDER: PropDef[] = [
 ];
 const EFFECTS: PropDef[] = [
   { key: "boxShadow", cssProp: "box-shadow", label: "box-shadow", kind: "shadow" },
-  { key: "opacity", cssProp: "opacity", label: "opacity", kind: "text" },
 ];
 const ALL_DEFS: PropDef[] = [
   ...SPACING_SIZE, ...COLORS, ...TYPOGRAPHY, ...BORDER, ...EFFECTS,
@@ -121,15 +122,20 @@ function inferSizingMode(el: Element, axis: "width" | "height", override: string
 }
 
 export function ElementInspector({ element, source, onDeselect }: Props) {
-  const [overrides, setOverrides] = useState<Overrides>({});
+  const overridesH = useHistory<Overrides>({});
+  const overrides = overridesH.value;
+  const setOverrides = overridesH.set;
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [, setDomTick] = useState(0);
 
   useEffect(() => {
-    setOverrides({});
+    overridesH.reset({});
     setStatus("idle");
     setStatusMessage("");
+    // Reset must happen on element change; intentionally exclude `overridesH`
+    // from deps so we don't reset on history shape changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [element, source?.file, source?.line]);
 
   useEffect(() => {
@@ -139,24 +145,47 @@ export function ElementInspector({ element, source, onDeselect }: Props) {
     return () => mo.disconnect();
   }, [element]);
 
+  // Sync overrides → element.style. Re-runs after every change including
+  // undo/redo, so the canvas reflects the active overrides.
+  useEffect(() => {
+    const el = element as HTMLElement;
+    for (const def of ALL_DEFS) {
+      const v = overrides[def.key];
+      if (v != null && v !== "") el.style.setProperty(def.cssProp, v);
+      else el.style.removeProperty(def.cssProp);
+    }
+  }, [element, overrides]);
+
+  // Cmd+Z / Cmd+Shift+Z while element tab is mounted.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const action = isUndoRedoKey(e);
+      if (!action) return;
+      e.preventDefault();
+      if (action === "undo") overridesH.undo();
+      else overridesH.redo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [overridesH]);
+
   const headerLabel = useMemo(() => describeElement(element, source ?? null), [element, source]);
 
+  const [textStyles, setTextStyles] = useState<TextStyle[]>([]);
+  useEffect(() => { setTextStyles(readAllTextStyles()); }, []);
+
   const setValue = useCallback((def: PropDef, value: string | null) => {
-    const el = element as HTMLElement;
-    if (value === null || value === "") {
-      el.style.removeProperty(def.cssProp);
-      setOverrides((prev) => { const next = { ...prev }; delete next[def.key]; return next; });
-    } else {
-      el.style.setProperty(def.cssProp, value);
-      setOverrides((prev) => ({ ...prev, [def.key]: value }));
-    }
-  }, [element]);
+    setOverrides((prev) => {
+      const next = { ...prev };
+      if (value === null || value === "") delete next[def.key];
+      else next[def.key] = value;
+      return next;
+    });
+  }, [setOverrides]);
 
   const resetAll = useCallback(() => {
-    const el = element as HTMLElement;
-    for (const def of ALL_DEFS) el.style.removeProperty(def.cssProp);
     setOverrides({});
-  }, [element]);
+  }, [setOverrides]);
 
   const save = useCallback(async () => {
     if (!source) { setStatus("error"); setStatusMessage("No source location available"); return; }
@@ -207,6 +236,33 @@ export function ElementInspector({ element, source, onDeselect }: Props) {
         {!source && <div style={{ marginBottom: 12, borderRadius: 4, background: "#fff4f4", padding: "8px", fontSize: 11, color: "#e6365a" }}>This element has no JSX source location. Saves will fail.</div>}
         <LayoutSection element={element} overrides={overrides} onChange={setValue} />
         <Section title="Spacing + Size" defs={SPACING_SIZE} element={element} overrides={overrides} onChange={setValue} />
+        {textStyles.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div className="dw-section-label" style={{ marginBottom: 8 }}>Text style</div>
+            <div style={{ display: "grid", gridTemplateColumns: "108px 1fr auto", alignItems: "center", gap: 8, padding: "2px 4px" }}>
+              <label style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--dw-font)", fontSize: 12, fontWeight: 500, color: "var(--dw-text-secondary)", paddingLeft: 12 }}>style</label>
+              <div style={{ minWidth: 0 }}>
+                <select
+                  className="dw-input-md"
+                  style={{ appearance: "auto" }}
+                  value=""
+                  onChange={(e) => {
+                    const picked = textStyles.find((s) => s.className === e.target.value);
+                    if (!picked) return;
+                    for (const [cssProp, val] of Object.entries(picked.declarations)) {
+                      const key = cssProp.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+                      setValue({ key, cssProp, label: cssProp, kind: "text" }, val);
+                    }
+                  }}
+                >
+                  <option value="">— apply text style —</option>
+                  {textStyles.map((s) => <option key={s.className} value={s.className}>{s.className}</option>)}
+                </select>
+              </div>
+              <span style={{ width: 24 }} />
+            </div>
+          </div>
+        )}
         <Section title="Typography" defs={TYPOGRAPHY} element={element} overrides={overrides} onChange={setValue} />
         <Section title="Colors" defs={COLORS} element={element} overrides={overrides} onChange={setValue} />
 
@@ -214,8 +270,8 @@ export function ElementInspector({ element, source, onDeselect }: Props) {
           <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div className="dw-section-label">Border</div>
             {borderVisible
-              ? <button onClick={removeBorder} className="dw-ghost">remove</button>
-              : <button onClick={addBorder} className="dw-ghost">+ add</button>}
+              ? <button onClick={removeBorder} className="dw-icon-btn" aria-label="remove border" title="remove border"><MinusIcon /></button>
+              : <button onClick={addBorder} className="dw-icon-btn" aria-label="add border" title="add border"><PlusIcon /></button>}
           </div>
           {borderVisible && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{BORDER.map((def) => <Row key={def.key} def={def} element={element} override={overrides[def.key]} onChange={(v) => setValue(def, v)} />)}</div>}
         </div>
@@ -224,10 +280,10 @@ export function ElementInspector({ element, source, onDeselect }: Props) {
           <div style={{ marginBottom: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div className="dw-section-label">Effects</div>
             {hasShadow
-              ? <button onClick={() => setValue({ key: "boxShadow", cssProp: "box-shadow", label: "", kind: "shadow" }, "none")} className="dw-ghost">remove shadow</button>
-              : <button onClick={() => setValue({ key: "boxShadow", cssProp: "box-shadow", label: "", kind: "shadow" }, "0 4px 12px rgba(0, 0, 0, 0.08)")} className="dw-ghost">+ add shadow</button>}
+              ? <button onClick={() => setValue({ key: "boxShadow", cssProp: "box-shadow", label: "", kind: "shadow" }, "none")} className="dw-icon-btn" aria-label="remove shadow" title="remove shadow"><MinusIcon /></button>
+              : <button onClick={() => setValue({ key: "boxShadow", cssProp: "box-shadow", label: "", kind: "shadow" }, "0 4px 12px rgba(0, 0, 0, 0.08)")} className="dw-icon-btn" aria-label="add shadow" title="add shadow"><PlusIcon /></button>}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{EFFECTS.map((def) => <Row key={def.key} def={def} element={element} override={overrides[def.key]} onChange={(v) => setValue(def, v)} />)}</div>
+          {hasShadow && <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>{EFFECTS.map((def) => <Row key={def.key} def={def} element={element} override={overrides[def.key]} onChange={(v) => setValue(def, v)} />)}</div>}
         </div>
       </div>
 
@@ -314,23 +370,47 @@ function Row({ def, element, override, onChange }: { def: PropDef; element: Elem
 
   if (useSlider) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 6, borderRadius: 4, background: dirty ? "#fff4f4" : "transparent", padding: "2px 4px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 4px" }}>
         <CssSlider def={def} value={value} range={range!} onChange={onChange} />
         {dirty
-          ? <button onClick={() => onChange(null)} className="dw-ghost" title="reset">×</button>
-          : <span style={{ width: 16 }} />}
+          ? <button onClick={() => onChange(null)} className="dw-reset-btn" title="reset"><CloseIcon /></button>
+          : <span style={{ width: 24 }} />}
       </div>
     );
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "108px 1fr auto", alignItems: "center", gap: 8, borderRadius: 4, background: dirty ? "#fff4f4" : "transparent", padding: "2px 4px" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "108px 1fr auto", alignItems: "center", gap: 8, padding: "2px 4px" }}>
       {/* paddingLeft: 12 mirrors the slider's internal label inset so labels
           line up vertically across slider rows and non-slider rows. */}
       <label style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--dw-font)", fontSize: 12, fontWeight: 500, color: "var(--dw-text-secondary)", paddingLeft: 12 }}>{def.label}</label>
       <div style={{ minWidth: 0 }}><Control def={def} value={value} onChange={onChange} /></div>
-      {dirty ? <button onClick={() => onChange(null)} className="dw-ghost" title="reset">×</button> : <span style={{ width: 16 }} />}
+      {dirty ? <button onClick={() => onChange(null)} className="dw-reset-btn" title="reset"><CloseIcon /></button> : <span style={{ width: 24 }} />}
     </div>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function MinusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M2 7h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -390,14 +470,24 @@ function Control({ def, value, onChange }: { def: PropDef; value: string; onChan
     const hex = rgbToHex(value) ?? (value.startsWith("#") ? value : "#000000");
     const display = value.startsWith("#") ? value : (rgbToHex(value) ?? value);
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, height: 32 }}>
+        {/* Borderless swatch — same look as Tokens tab. */}
         <input
           type="color"
           value={hex}
           onChange={(e) => onChange(e.target.value)}
-          style={{ height: 32, width: 32, flexShrink: 0, cursor: "pointer", borderRadius: 8, border: "1px solid #e5e5e5", background: "white", padding: 0, overflow: "hidden" }}
+          aria-label={`pick ${def.label}`}
+          className="dw-color-input"
+          style={{
+            height: 32,
+            width: 32,
+            flexShrink: 0,
+            borderRadius: 8,
+            background: hex,
+            boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)",
+          }}
         />
-        <SmartInput plain value={display} onChange={onChange} placeholder="#hex / rgb / var()" className="dw-input-md" />
+        <SmartInput plain value={display} onChange={onChange} placeholder="#hex" className="dw-input-md" />
       </div>
     );
   }

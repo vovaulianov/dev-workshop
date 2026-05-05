@@ -161,17 +161,32 @@ export function ComponentPreview({ entry, variantIndex, argsOverride, selected, 
             <div className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "#b3b3b3" }}>{entry.sourceFile}</div>
           </div>
           <div className="dw-mono" style={{ fontSize: 10, color: "#b3b3b3", flexShrink: 0 }}>
-            {" "}<kbd className="dw-kbd">⌘</kbd>+ click or Element tab to select · <kbd className="dw-kbd">⌥</kbd> for spacing · <kbd className="dw-kbd">esc</kbd> hides outline
+            {" "}<kbd className="dw-kbd">⌘</kbd> + click or Element tab to select · <kbd className="dw-kbd">⌥</kbd> for spacing · <kbd className="dw-kbd">esc</kbd> hides outline
           </div>
         </header>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, borderTop: "1px solid #f1f1f1", padding: "8px 16px" }}>
           <div className="dw-section-label">Width</div>
-          <div style={{ display: "flex", gap: 4 }}>
+          <div className="dw-segments" style={{ flexShrink: 0 }}>
             {WIDTH_PRESETS.map((w) => (
-              <button key={w} onClick={() => setWidth(w)} className="dw-pill" data-active={width === w ? "true" : "false"}>{w}</button>
+              <button
+                key={w}
+                onClick={() => setWidth(w)}
+                className="dw-segment"
+                data-active={width === w ? "true" : "false"}
+                style={{ minWidth: 44, padding: "0 10px", height: 26, fontSize: 12 }}
+              >
+                {w}
+              </button>
             ))}
-            <button onClick={() => setWidth("full")} className="dw-pill" data-active={width === "full" ? "true" : "false"}>full</button>
+            <button
+              onClick={() => setWidth("full")}
+              className="dw-segment"
+              data-active={width === "full" ? "true" : "false"}
+              style={{ minWidth: 44, padding: "0 10px", height: 26, fontSize: 12 }}
+            >
+              full
+            </button>
           </div>
           <div style={{ marginLeft: 8, display: "flex", alignItems: "center", gap: 4 }}>
             <input
@@ -179,12 +194,11 @@ export function ComponentPreview({ entry, variantIndex, argsOverride, selected, 
               value={width === "full" ? "" : width}
               onChange={(e) => { const v = Number(e.target.value); if (!Number.isNaN(v) && v > 0) setWidth(v); }}
               placeholder="custom"
-              className="dw-input dw-input-sm"
+              className="dw-input-md"
               style={{ width: 80 }}
             />
-            <span className="dw-mono" style={{ fontSize: 10, color: "#b3b3b3" }}>px</span>
           </div>
-          <div className="dw-mono" style={{ marginLeft: "auto", fontSize: 10, color: "#b3b3b3" }}>{widthLabel}</div>
+          <div className="dw-mono" style={{ marginLeft: "auto", fontSize: 11, color: "#b3b3b3" }}>{widthLabel}</div>
         </div>
       </div>
 

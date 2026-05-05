@@ -6,6 +6,7 @@ import { StylePanel } from "./StylePanel";
 import { buildComponentEntries } from "../lib/storyLoader";
 import type { ComponentEntry } from "../lib/storyLoader";
 import { generateStubs } from "../lib/devApi";
+import { isUndoRedoKey, useHistory } from "../lib/useHistory";
 
 /**
  * Stories are discovered via `virtual:dev-workshop/stories`, a virtual module
@@ -94,6 +95,44 @@ const STYLES = `
 [data-dev-workshop] .dw-badge svg {
   flex-shrink: 0;
   display: block;
+}
+
+/* Scroll container with hidden scrollbar (still scrollable). Use on chrome
+   panels, never on the canvas — the user's component might rely on visible
+   scrollbars. */
+[data-dev-workshop] .dw-scroll {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+[data-dev-workshop] .dw-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Native color input wrapper: kill the default browser swatch border that
+   shows as an inner rectangle. Apply via class to avoid leaking into the
+   consumer's color inputs that render inside the canvas. */
+[data-dev-workshop] .dw-color-input {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+}
+[data-dev-workshop] .dw-color-input::-webkit-color-swatch-wrapper {
+  padding: 0;
+  border-radius: inherit;
+}
+[data-dev-workshop] .dw-color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: inherit;
+}
+[data-dev-workshop] .dw-color-input::-moz-color-swatch {
+  border: none;
+  border-radius: inherit;
 }
 
 /* Each chrome class is self-contained: includes its own font-family, border:none,
@@ -346,6 +385,31 @@ const STYLES = `
   border-radius: 8px;
 }
 
+/* Square 28-tall icon button — used for + add / - remove and the per-row
+   reset (×). Plain ghost look, subtle hover. */
+[data-dev-workshop] .dw-icon-btn,
+[data-dev-workshop] .dw-reset-btn {
+  appearance: none;
+  box-sizing: border-box;
+  cursor: pointer;
+  border: none;
+  margin: 0;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--dw-text-muted);
+  transition: background 120ms, color 120ms;
+}
+[data-dev-workshop] .dw-icon-btn:hover,
+[data-dev-workshop] .dw-reset-btn:hover {
+  background: var(--dw-bg-input);
+  color: var(--dw-text);
+}
+
 /* Segmented control: tab switcher in StylePanel header */
 [data-dev-workshop] .dw-segments {
   display: flex;
@@ -575,10 +639,26 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
   const [selected, setSelected] = useState<ComponentEntry | null>(componentEntries[0] ?? null);
   const [variantIndex, setVariantIndex] = useState(0);
   const [variantExplicit, setVariantExplicit] = useState(false);
-  const [argsOverride, setArgsOverride] = useState<ArgsOverride>({});
+  const argsOverrideH = useHistory<ArgsOverride>({});
+  const argsOverride = argsOverrideH.value;
+  const setArgsOverride = argsOverrideH.set;
   const [selectedEl, setSelectedEl] = useState<SelectedElement | null>(null);
   const [outlineHidden, setOutlineHidden] = useState(false);
   const [tab, setTab] = useState<Tab>("props");
+
+  // Cmd+Z / Cmd+Shift+Z while Props tab is active → undo/redo args overrides.
+  useEffect(() => {
+    if (tab !== "props") return;
+    const onKey = (e: KeyboardEvent) => {
+      const action = isUndoRedoKey(e);
+      if (!action) return;
+      e.preventDefault();
+      if (action === "undo") argsOverrideH.undo();
+      else argsOverrideH.redo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tab, argsOverrideH]);
 
   const [sidebarWidth, setSidebarWidth] = useState(() => readLSNumber(LS_SIDEBAR, 240));
   const [panelWidth, setPanelWidth] = useState(() => readLSNumber(LS_PANEL, 360));
@@ -590,18 +670,18 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
     setSelected(entry);
     setVariantIndex(variantIdx ?? 0);
     setVariantExplicit(variantIdx !== null);
-    setArgsOverride({});
+    argsOverrideH.reset({});
     setSelectedEl(null);
     setOutlineHidden(false);
-  }, []);
+  }, [argsOverrideH]);
 
   const handleVariantChange = useCallback((i: number) => {
     setVariantIndex(i);
     setVariantExplicit(true);
-    setArgsOverride({});
+    argsOverrideH.reset({});
     setSelectedEl(null);
     setOutlineHidden(false);
-  }, []);
+  }, [argsOverrideH]);
 
   // Auto-switch to Element tab when something is selected via canvas click
   useEffect(() => {
@@ -613,11 +693,17 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      // On Element tab, Esc exits inspect mode and goes back to Props.
+      if (tab === "element") {
+        setTab("props");
+        setSelectedEl(null);
+        return;
+      }
       if (selectedEl && !outlineHidden) setOutlineHidden(true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedEl, outlineHidden]);
+  }, [selectedEl, outlineHidden, tab]);
 
   useEffect(() => { if (selectedEl) setOutlineHidden(false); }, [selectedEl?.element]);
 

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
 
 interface Props {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   className?: string;
+  style?: CSSProperties;
   plain?: boolean;
 }
 
@@ -23,7 +24,7 @@ function parseNumberUnit(v: string): { num: number; unit: string } | null {
  * Text input for CSS values. ↑/↓ increments numeric values (Shift = ±10).
  * On Enter/blur, auto-appends unit from the previous value if omitted.
  */
-export function SmartInput({ value, onChange, placeholder, className, plain }: Props) {
+export function SmartInput({ value, onChange, placeholder, className, style, plain }: Props) {
   const [local, setLocal] = useState(value);
   const lastCommittedRef = useRef(value);
   const composingRef = useRef(false);
@@ -86,6 +87,7 @@ export function SmartInput({ value, onChange, placeholder, className, plain }: P
       onCompositionEnd={() => { composingRef.current = false; }}
       placeholder={placeholder}
       className={className}
+      style={style}
       spellCheck={false}
     />
   );

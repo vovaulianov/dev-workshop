@@ -77,7 +77,7 @@ export function ComponentSidebar({ entries, selectedId, variantIndex, variantExp
         </div>
       </div>
 
-      <nav className="dw-scroll" style={{ flex: 1, padding: "8px 8px" }}>
+      <nav className="dw-scroll" style={{ flex: 1, minHeight: 0, padding: "8px 8px" }}>
         {categoryOrder.length === 0 && (
           <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "#b3b3b3" }}>Nothing matches</div>
         )}

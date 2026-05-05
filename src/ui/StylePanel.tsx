@@ -4,12 +4,15 @@ import {
   applyTokenOverride,
   clearTokenOverrides,
   patchRootBlock,
+  readAllTextStyles,
   readAllTokens,
   readFile,
   writeFile,
+  type TextStyle,
   type TokenInfo,
 } from "../lib/devApi";
 import { inferPropDescriptors, type PropDescriptor } from "../lib/propsInference";
+import { isUndoRedoKey, useHistory } from "../lib/useHistory";
 import { ElementInspector } from "./ElementInspector";
 import type { SelectedElement } from "./ComponentPreview";
 
@@ -120,16 +123,24 @@ function PropsTab({ entry, variantIndex, argsOverride, onArgsOverrideChange }: {
 
 function PropRow({ descriptor, value, overridden, onChange, onReset }: { descriptor: PropDescriptor; value: unknown; overridden: boolean; onChange: (v: unknown) => void; onReset: () => void }) {
   const { key, control } = descriptor;
-  return (
-    <div style={{ borderRadius: 6, border: overridden ? "1px solid #e5e5e5" : "1px solid transparent", background: overridden ? "#fafafa" : "transparent", padding: "6px 8px" }}>
-      <div style={{ marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <label className="dw-mono" style={{ fontSize: 11, color: "#101114" }}>{key}</label>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 9, color: "#b3b3b3" }}>
-          <span style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}>{control.kind}</span>
-          {overridden && <button onClick={onReset} className="dw-ghost">reset</button>}
+  const isMultiLine = control.kind === "json";
+  if (isMultiLine) {
+    // JSON/object editors break to multi-line; keep label on top.
+    return (
+      <div style={{ padding: "2px 4px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, paddingLeft: 12 }}>
+          <label className="dw-mono" style={{ fontSize: 12, fontWeight: 500, color: "var(--dw-text-secondary)" }}>{key}</label>
+          {overridden && <button onClick={onReset} className="dw-reset-btn" title="reset"><PropCloseIcon /></button>}
         </div>
+        <PropControl control={control} value={value} onChange={onChange} />
       </div>
-      <PropControl control={control} value={value} onChange={onChange} />
+    );
+  }
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "108px 1fr auto", alignItems: "center", gap: 8, padding: "2px 4px" }}>
+      <label className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--dw-font)", fontSize: 12, fontWeight: 500, color: "var(--dw-text-secondary)", paddingLeft: 12 }}>{key}</label>
+      <div style={{ minWidth: 0 }}><PropControl control={control} value={value} onChange={onChange} /></div>
+      {overridden ? <button onClick={onReset} className="dw-reset-btn" title="reset"><PropCloseIcon /></button> : <span style={{ width: 24 }} />}
     </div>
   );
 }
@@ -144,15 +155,15 @@ function JsonControl({ value, onChange }: { value: unknown; onChange: (v: unknow
 function ObjectEditor({ value, onChange, onSwitchToRaw }: { value: Record<string, unknown>; onChange: (v: unknown) => void; onSwitchToRaw: () => void }) {
   const setKey = (key: string, nextVal: unknown) => onChange({ ...value, [key]: nextVal });
   return (
-    <div style={{ borderRadius: 4, border: "1px solid #e5e5e5", background: "white" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: "1px solid #e5e5e5", padding: "4px 8px" }}>
-        <div className="dw-mono" style={{ fontSize: 9, textTransform: "uppercase", letterSpacing: "0.05em", color: "#b3b3b3" }}>object · {Object.keys(value).length} keys</div>
-        <button onClick={onSwitchToRaw} className="dw-ghost">raw json</button>
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, paddingLeft: 12 }}>
+        <div className="dw-section-label">{Object.keys(value).length} keys</div>
+        <button onClick={onSwitchToRaw} className="dw-link">raw json</button>
       </div>
-      <div style={{ display: "flex", flexDirection: "column" }}>
-        {Object.entries(value).map(([k, v], idx, arr) => (
-          <div key={k} style={{ display: "grid", gridTemplateColumns: "90px 1fr", alignItems: "start", gap: 8, borderBottom: idx < arr.length - 1 ? "1px solid #f1f1f1" : undefined, padding: "4px 8px" }}>
-            <label className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", paddingTop: 4, fontSize: 10, color: "#404040" }} title={k}>{k}</label>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {Object.entries(value).map(([k, v]) => (
+          <div key={k} style={{ display: "grid", gridTemplateColumns: "108px 1fr", alignItems: "center", gap: 8, padding: "2px 4px" }}>
+            <label className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--dw-font)", fontSize: 12, fontWeight: 500, color: "var(--dw-text-secondary)", paddingLeft: 12 }} title={k}>{k}</label>
             <div style={{ minWidth: 0 }}><ObjectValueControl value={v} type={v === null ? "null" : typeof v} onChange={(nv) => setKey(k, nv)} /></div>
           </div>
         ))}
@@ -168,29 +179,32 @@ function ObjectValueControl({ value, type, onChange }: { value: unknown; type: s
       <button
         onClick={() => onChange(!checked)}
         style={{
+          appearance: "none",
           display: "flex",
-          height: 20,
-          width: 36,
+          height: 28,
+          width: 48,
           alignItems: "center",
           justifyContent: checked ? "flex-end" : "flex-start",
           borderRadius: 999,
-          border: checked ? "1px solid #101114" : "1px solid #e5e5e5",
-          background: checked ? "#101114" : "#f4f4f4",
+          border: "none",
+          background: checked ? "#101114" : "#e5e5e5",
+          padding: 2,
+          cursor: "pointer",
           transition: "background 120ms",
         }}
       >
-        <span style={{ margin: "0 2px", height: 16, width: 16, borderRadius: 999, background: "white" }} />
+        <span style={{ height: 24, width: 24, borderRadius: 999, background: "white", boxShadow: "0 1px 2px rgba(0,0,0,0.15)" }} />
       </button>
     );
   }
-  if (type === "number") return <input type="number" value={typeof value === "number" ? value : ""} onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))} className="dw-input dw-input-sm" />;
+  if (type === "number") return <input type="number" value={typeof value === "number" ? value : ""} onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))} className="dw-input-md" />;
   if (type === "string") {
     const str = (value as string) ?? "";
     const isLong = str.length > 40 || str.includes("\n");
-    if (isLong) return <textarea value={str} onChange={(e) => onChange(e.target.value)} rows={Math.min(5, Math.max(2, str.split("\n").length))} className="dw-input dw-input-sm" style={{ resize: "none", lineHeight: 1.4 }} spellCheck={false} />;
-    return <input type="text" value={str} onChange={(e) => onChange(e.target.value)} className="dw-input dw-input-sm" />;
+    if (isLong) return <textarea value={str} onChange={(e) => onChange(e.target.value)} rows={Math.min(5, Math.max(2, str.split("\n").length))} className="dw-input-md" style={{ resize: "none", lineHeight: 1.4, height: "auto", padding: "8px 12px" }} spellCheck={false} />;
+    return <input type="text" value={str} onChange={(e) => onChange(e.target.value)} className="dw-input-md" />;
   }
-  if (value === undefined) return <input type="text" value="" placeholder="undefined — type to set" onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)} className="dw-input dw-input-sm" style={{ fontStyle: "normal" }} />;
+  if (value === undefined) return <input type="text" value="" placeholder="undefined — type to set" onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)} className="dw-input-md" />;
   return <RawJsonEditor value={value} onChange={onChange} />;
 }
 
@@ -214,6 +228,14 @@ function RawJsonEditor({ value, onChange, onSwitchToObject }: { value: unknown; 
   );
 }
 
+function PropCloseIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function PropControl({ control, value, onChange }: { control: PropDescriptor["control"]; value: unknown; onChange: (v: unknown) => void }) {
   if (control.kind === "boolean") {
     const checked = Boolean(value);
@@ -221,27 +243,30 @@ function PropControl({ control, value, onChange }: { control: PropDescriptor["co
       <button
         onClick={() => onChange(!checked)}
         style={{
+          appearance: "none",
           display: "flex",
-          height: 24,
-          width: 44,
+          height: 28,
+          width: 48,
           alignItems: "center",
           justifyContent: checked ? "flex-end" : "flex-start",
           borderRadius: 999,
-          border: checked ? "1px solid #101114" : "1px solid #e5e5e5",
-          background: checked ? "#101114" : "#f4f4f4",
+          border: "none",
+          background: checked ? "#101114" : "#e5e5e5",
+          padding: 2,
+          cursor: "pointer",
           transition: "background 120ms",
         }}
       >
-        <span style={{ margin: "0 2px", height: 20, width: 20, borderRadius: 999, background: "white", boxShadow: "0 1px 2px rgba(0,0,0,0.1)" }} />
+        <span style={{ height: 24, width: 24, borderRadius: 999, background: "white", boxShadow: "0 1px 2px rgba(0,0,0,0.15)", transition: "transform 160ms" }} />
       </button>
     );
   }
-  if (control.kind === "number") return <input type="number" value={typeof value === "number" ? value : ""} onChange={(e) => { const v = e.target.value; onChange(v === "" ? undefined : Number(v)); }} className="dw-input" />;
+  if (control.kind === "number") return <input type="number" value={typeof value === "number" ? value : ""} onChange={(e) => { const v = e.target.value; onChange(v === "" ? undefined : Number(v)); }} className="dw-input-md" />;
   if (control.kind === "select") {
     return (
       <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
         {control.options.map((opt) => (
-          <button key={opt} onClick={() => onChange(opt)} className="dw-pill" data-active={value === opt ? "true" : "false"}>{opt}</button>
+          <button key={opt} onClick={() => onChange(opt)} className="dw-pill-md" data-active={value === opt ? "true" : "false"}>{opt}</button>
         ))}
       </div>
     );
@@ -249,24 +274,61 @@ function PropControl({ control, value, onChange }: { control: PropDescriptor["co
   if (control.kind === "json") return <JsonControl value={value} onChange={onChange} />;
   if (control.kind === "node") {
     const isScalar = value === null || value === undefined || typeof value === "string";
-    if (!isScalar) return <div className="dw-mono" style={{ borderRadius: 4, background: "#f4f4f4", padding: "4px 8px", fontSize: 10, color: "#808080" }}>(ReactNode — not editable)</div>;
-    return <input type="text" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} className="dw-input" />;
+    if (!isScalar) return <div className="dw-mono" style={{ borderRadius: 6, background: "#f4f4f4", padding: "8px 12px", fontSize: 11, color: "#808080", height: 32, display: "flex", alignItems: "center" }}>(ReactNode — not editable)</div>;
+    return <input type="text" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} className="dw-input-md" />;
   }
-  return <input type="text" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} className="dw-input" />;
+  return <input type="text" value={typeof value === "string" ? value : ""} onChange={(e) => onChange(e.target.value)} className="dw-input-md" />;
 }
 
 /* ─────────────────────────────── Tokens Tab ─────────────────────────────── */
 
 function TokensTab({ tokensCssFile }: { tokensCssFile: string }) {
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
-  const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [textStyles, setTextStyles] = useState<TextStyle[]>([]);
+  const overridesH = useHistory<Record<string, string>>({});
+  const overrides = overridesH.value;
+  const setOverrides = overridesH.set;
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
 
-  useEffect(() => { setTokens(readAllTokens()); }, []);
+  useEffect(() => {
+    setTokens(readAllTokens());
+    setTextStyles(readAllTextStyles());
+  }, []);
 
-  const handleChange = useCallback((name: string, value: string) => { applyTokenOverride(name, value); setOverrides((prev) => ({ ...prev, [name]: value })); }, []);
-  const reset = useCallback(() => { clearTokenOverrides(Object.keys(overrides)); setOverrides({}); setTokens(readAllTokens()); setStatus("idle"); setStatusMessage(""); }, [overrides]);
+  // Sync overrides → :root CSS variables. Re-runs after each change including
+  // undo/redo so the canvas reflects the active values.
+  useEffect(() => {
+    const live = new Set(Object.keys(overrides));
+    for (const [name, value] of Object.entries(overrides)) applyTokenOverride(name, value);
+    return () => {
+      // Clear only the ones we set so we don't stomp on tokens we never touched.
+      clearTokenOverrides([...live]);
+    };
+  }, [overrides]);
+
+  // Cmd+Z / Cmd+Shift+Z while Tokens tab is mounted.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const action = isUndoRedoKey(e);
+      if (!action) return;
+      e.preventDefault();
+      if (action === "undo") overridesH.undo();
+      else overridesH.redo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [overridesH]);
+
+  const handleChange = useCallback((name: string, value: string) => {
+    setOverrides((prev) => ({ ...prev, [name]: value }));
+  }, [setOverrides]);
+  const reset = useCallback(() => {
+    setOverrides({});
+    setTokens(readAllTokens());
+    setStatus("idle");
+    setStatusMessage("");
+  }, [setOverrides]);
   const save = useCallback(async () => {
     if (Object.keys(overrides).length === 0) return;
     setStatus("saving"); setStatusMessage("Saving…");
@@ -283,7 +345,15 @@ function TokensTab({ tokensCssFile }: { tokensCssFile: string }) {
 
   return (
     <div style={{ display: "flex", flex: 1, flexDirection: "column", overflow: "hidden" }}>
-      <div style={{ flex: 1, overflowY: "auto", padding: 12, fontSize: 12 }}>
+      <div className="dw-scroll" style={{ flex: 1, minHeight: 0, padding: 12, fontSize: 12 }}>
+        {textStyles.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div className="dw-section-label" style={{ marginBottom: 8 }}>Text styles</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {textStyles.map((s) => <TextStyleRow key={s.className} style={s} />)}
+            </div>
+          </div>
+        )}
         {Object.entries(groups).map(([group, tokensInGroup]) => (
           <div key={group} style={{ marginBottom: 16 }}>
             <div className="dw-section-label" style={{ marginBottom: 8 }}>{group}</div>
@@ -308,23 +378,57 @@ function TokensTab({ tokensCssFile }: { tokensCssFile: string }) {
 
 function TokenRow({ token, overrideValue, onChange }: { token: TokenInfo; overrideValue: string | undefined; onChange: (name: string, value: string) => void }) {
   const value = overrideValue ?? token.value;
-  const dirty = overrideValue !== undefined;
   const handleInput = (v: string) => onChange(token.name, v);
+  if (token.kind === "color") {
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 160px", alignItems: "center", gap: 8, padding: "2px 4px" }}>
+        <label className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--dw-font-mono)", fontSize: 11, color: "var(--dw-text-secondary)", paddingLeft: 12 }} title={token.name}>{token.name}</label>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, height: 32 }}>
+          {/* Borderless swatch — clicking it opens the native color picker. */}
+          <input
+            type="color"
+            value={normalizeColor(value)}
+            onChange={(e) => handleInput(e.target.value)}
+            className="dw-color-input"
+            style={{ height: 32, width: 32, flexShrink: 0, borderRadius: 8, background: normalizeColor(value), boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.06)" }}
+          />
+          {/* Hex input uses the standard input style so it reads as a regular field. */}
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => handleInput(e.target.value)}
+            className="dw-input-md"
+            spellCheck={false}
+          />
+        </div>
+      </div>
+    );
+  }
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8, borderRadius: 6, background: dirty ? "#fff4f4" : "transparent", padding: "4px 8px" }}>
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 160px", alignItems: "center", gap: 8, padding: "2px 4px" }}>
+      <label className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--dw-font-mono)", fontSize: 11, color: "var(--dw-text-secondary)", paddingLeft: 12 }} title={token.name}>{token.name}</label>
+      <input type="text" value={value} onChange={(e) => handleInput(e.target.value)} className="dw-input-md" spellCheck={false} />
+    </div>
+  );
+}
+
+function TextStyleRow({ style }: { style: TextStyle }) {
+  // Build inline style from declarations to render the live preview.
+  const previewStyle: Record<string, string> = {};
+  for (const [k, v] of Object.entries(style.declarations)) {
+    // Convert kebab → camel for inline style API
+    const camel = k.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    previewStyle[camel] = v;
+  }
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center", gap: 8, padding: "6px 4px 6px 12px", borderRadius: 6 }}>
       <div style={{ minWidth: 0 }}>
-        <div className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11, color: "#404040" }}>{token.name}</div>
+        <div className="dw-mono" style={{ fontSize: 11, color: "var(--dw-text-secondary)", marginBottom: 4 }}>{style.className}</div>
+        <div style={{ minWidth: 0, color: "#101114", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", ...previewStyle }} title={Object.entries(style.declarations).map(([k, v]) => `${k}: ${v}`).join("; ")}>
+          Aa Bb Cc
+        </div>
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        {token.kind === "color" ? (
-          <>
-            <input type="color" value={normalizeColor(value)} onChange={(e) => handleInput(e.target.value)} style={{ height: 24, width: 24, cursor: "pointer", borderRadius: 4, border: "1px solid #e5e5e5", background: "white", padding: 0 }} />
-            <input type="text" value={value} onChange={(e) => handleInput(e.target.value)} className="dw-input dw-input-sm" style={{ width: 80 }} />
-          </>
-        ) : (
-          <input type="text" value={value} onChange={(e) => handleInput(e.target.value)} className="dw-input dw-input-sm" style={{ width: 144 }} />
-        )}
-      </div>
+      <span className="dw-mono" style={{ flexShrink: 0, fontSize: 10, color: "var(--dw-text-placeholder)" }}>{Object.keys(style.declarations).length} props</span>
     </div>
   );
 }
