@@ -56,6 +56,16 @@ function makeId(): FrameId {
   return Math.random().toString(36).slice(2, 10);
 }
 
+function deepCloneOverrides(
+  overrides: Record<SourceLoc, StyleOverride>,
+): Record<SourceLoc, StyleOverride> {
+  const out: Record<SourceLoc, StyleOverride> = {};
+  for (const [loc, styles] of Object.entries(overrides)) {
+    out[loc] = { ...styles };
+  }
+  return out;
+}
+
 export function sourceToLoc(src: ElementSource): SourceLoc {
   return `${src.file}:${src.line}:${src.column}`;
 }
@@ -137,6 +147,24 @@ export interface UseCanvasState {
 
   /** Update selection — single sourceLoc per frame in Phase 1. */
   setSelection: (sel: { frameId: FrameId; sourceLoc: SourceLoc | null }) => void;
+
+  /** Promote a frame to active without changing element selection. Used when
+   *  the user clicks the body of a non-active frame on the canvas. */
+  setActiveFrame: (frameId: FrameId) => void;
+
+  /** Duplicate `sourceFrameId` (or active frame if omitted) — copies overrides
+   *  AND sketchbook (when Phase 3 lands) and offsets the new frame to the
+   *  right. Returns the new frame id. The duplicate becomes the active
+   *  frame so subsequent edits land on it. */
+  addFrame: (sourceFrameId?: FrameId, frameWidth?: number) => FrameId;
+
+  /** Remove a frame. No-ops if `frameId` is the only remaining frame —
+   *  the canvas always retains at least one. If the removed frame was
+   *  active, the next sibling (or previous if last) becomes active. */
+  removeFrame: (frameId: FrameId) => void;
+
+  /** Rename a frame's label (e.g. "Default", "Variant 2", "Red CTA"). */
+  setFrameLabel: (frameId: FrameId, label: string) => void;
 
   /** Pan/zoom mutators. */
   setPan: (next: { x: number; y: number }) => void;
@@ -259,6 +287,99 @@ export function useCanvasState(componentId: string, defaultVariantIndex: number)
     [h],
   );
 
+  const setActiveFrame = useCallback<UseCanvasState["setActiveFrame"]>(
+    (frameId) =>
+      h.set((curr) => {
+        if (curr.activeFrameId === frameId) return curr;
+        // Switching frame clears element selection — picking a different
+        // frame's element on the next click would otherwise inherit a
+        // stale loc from the prior frame.
+        return {
+          ...curr,
+          activeFrameId: frameId,
+          selection: { frameId, sourceLoc: null },
+        };
+      }),
+    [h],
+  );
+
+  const addFrame = useCallback<UseCanvasState["addFrame"]>(
+    (sourceFrameId, frameWidth = 430) => {
+      const newId = makeId();
+      h.set((curr) => {
+        const source = curr.frames.find(
+          (f) => f.id === (sourceFrameId ?? curr.activeFrameId),
+        ) ?? curr.frames[0]!;
+        const sourceIndex = curr.frames.findIndex((f) => f.id === source.id);
+        // Place the duplicate to the right of the source. Frames live in
+        // canvas coords; CanvasStage renders them inside the pan/zoom
+        // transform, so absolute positions are robust.
+        const GAP = 40;
+        const newX = source.x + frameWidth + GAP;
+        const newY = source.y;
+        // Generate a fresh label — "Frame N" where N is one beyond the
+        // current max numeric suffix, falling back to length+1.
+        const used = curr.frames
+          .map((f) => f.label.match(/^Frame (\d+)$/)?.[1])
+          .filter(Boolean)
+          .map((s) => Number(s));
+        const nextNum = used.length ? Math.max(...used) + 1 : curr.frames.length + 1;
+        const newFrame: Frame = {
+          id: newId,
+          x: newX,
+          y: newY,
+          label: `Frame ${nextNum}`,
+          variantIndex: source.variantIndex,
+          // Deep clone overrides so subsequent edits to the new frame
+          // don't mutate the source frame's map.
+          overrides: deepCloneOverrides(source.overrides),
+        };
+        const frames = [...curr.frames];
+        frames.splice(sourceIndex + 1, 0, newFrame);
+        return {
+          ...curr,
+          frames,
+          activeFrameId: newId,
+          selection: { frameId: newId, sourceLoc: null },
+        };
+      });
+      return newId;
+    },
+    [h],
+  );
+
+  const removeFrame = useCallback<UseCanvasState["removeFrame"]>(
+    (frameId) =>
+      h.set((curr) => {
+        if (curr.frames.length <= 1) return curr;
+        const idx = curr.frames.findIndex((f) => f.id === frameId);
+        if (idx === -1) return curr;
+        const frames = curr.frames.filter((f) => f.id !== frameId);
+        let activeFrameId = curr.activeFrameId;
+        if (curr.activeFrameId === frameId) {
+          // Pick neighbor: prefer the one to the right; fall back to left.
+          const nextActive = frames[idx] ?? frames[idx - 1] ?? frames[0]!;
+          activeFrameId = nextActive.id;
+        }
+        return {
+          ...curr,
+          frames,
+          activeFrameId,
+          selection: { frameId: activeFrameId, sourceLoc: null },
+        };
+      }),
+    [h],
+  );
+
+  const setFrameLabel = useCallback<UseCanvasState["setFrameLabel"]>(
+    (frameId, label) =>
+      h.set((curr) => ({
+        ...curr,
+        frames: curr.frames.map((f) => (f.id === frameId ? { ...f, label } : f)),
+      })),
+    [h],
+  );
+
   const setPan = useCallback<UseCanvasState["setPan"]>(
     (next) => h.set((curr) => ({ ...curr, pan: next })),
     [h],
@@ -318,6 +439,10 @@ export function useCanvasState(componentId: string, defaultVariantIndex: number)
     clearOverridesForLoc,
     clearAllOverrides,
     setSelection,
+    setActiveFrame,
+    addFrame,
+    removeFrame,
+    setFrameLabel,
     setPan,
     setZoom,
     pickWinner,

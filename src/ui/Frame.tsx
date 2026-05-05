@@ -30,6 +30,9 @@ interface Props {
   altHeld: boolean;
   /** Width preset for this frame's canvas. */
   width: number | "full";
+  /** Click on a non-active frame's body promotes it to active (multi-frame).
+   *  Phase 1 had only one frame so this was a no-op; Phase 2 wires it up. */
+  onActivate: () => void;
 }
 
 /**
@@ -47,6 +50,7 @@ export function Frame({
   onSelectElement,
   altHeld,
   width,
+  onActivate,
 }: Props) {
   const [canvas, setCanvas] = useState<HTMLDivElement | null>(null);
   const [hovered, setHovered] = useState<Element | null>(null);
@@ -162,8 +166,20 @@ export function Frame({
     if (!isActive) setHovered(null);
   }, [isActive]);
 
+  // Click anywhere on the frame wrapper (label, dashed border, padding)
+  // promotes it to active. Clicks on the canvas itself bubble through the
+  // capture-phase element handler first (which stops propagation), so this
+  // only fires for "meta-area" clicks like the label. Wrapper-click also
+  // deselects any previously-selected element so the inspector reflects
+  // the freshly-activated frame's empty state.
+  const onWrapperClick = () => {
+    if (!isActive) onActivate();
+    onSelectElement(null, null, null);
+  };
+
   return (
     <div
+      onClick={onWrapperClick}
       style={{
         position: "absolute",
         left: frame.x,

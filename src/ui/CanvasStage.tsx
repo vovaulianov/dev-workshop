@@ -34,7 +34,7 @@ export function CanvasStage({ entry, argsOverride, canvas, width, onSelectElemen
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [altHeld, setAltHeld] = useState(false);
   const [panning, setPanning] = useState(false);
-  const { state, setPan, setZoom, setSelection } = canvas;
+  const { state, setPan, setZoom, setSelection, setActiveFrame } = canvas;
 
   // Modifier-key tracking — for Distance layer (⌥) and Space-pan.
   useEffect(() => {
@@ -219,6 +219,7 @@ export function CanvasStage({ entry, argsOverride, canvas, width, onSelectElemen
               onSelectElement={(loc, el, src) => handleSelectInFrame(f.id, loc, el, src)}
               altHeld={altHeld}
               width={width}
+              onActivate={() => setActiveFrame(f.id)}
             />
           ))}
         </div>

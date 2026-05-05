@@ -659,6 +659,8 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
     clearOverridesForLoc,
     clearAllOverrides,
     setSelection: setCanvasSelection,
+    addFrame: canvasAddFrame,
+    removeFrame: canvasRemoveFrame,
     activeFrame,
   } = canvas;
 
@@ -676,19 +678,66 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
     return () => window.removeEventListener("keydown", onKey);
   }, [tab, argsOverrideH]);
 
-  // Cmd+Z / Cmd+Shift+Z while Element tab is active → undo/redo canvas state.
+  // Element-tab keyboard router: Cmd+Z/Shift+Z (undo/redo), Cmd+D
+  // (duplicate active frame), Backspace (delete active frame). All gated
+  // on the Element tab and ignored when the user is typing in an input.
   useEffect(() => {
     if (tab !== "element") return;
     const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      const inField =
+        !!t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable);
+
       const action = isUndoRedoKey(e);
-      if (!action) return;
-      e.preventDefault();
-      if (action === "undo") canvasUndo();
-      else canvasRedo();
+      if (action) {
+        e.preventDefault();
+        if (action === "undo") canvasUndo();
+        else canvasRedo();
+        return;
+      }
+
+      // Cmd+D — duplicate active frame. We pass the layout width
+      // (numeric or 430 fallback for "full") so the new frame is offset
+      // far enough not to overlap.
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        (e.key === "d" || e.key === "D") &&
+        !inField
+      ) {
+        e.preventDefault();
+        canvasAddFrame(activeFrame.id);
+        return;
+      }
+
+      // Backspace — delete active frame (no-op if there's only one). We
+      // ignore Backspace while inside text inputs OR when an element is
+      // selected (so the user doesn't accidentally remove a frame while
+      // typing into the inspector or after picking a leaf).
+      if ((e.key === "Backspace" || e.key === "Delete") && !inField) {
+        if (selectedEl) return;
+        if (canvas.state.frames.length <= 1) return;
+        e.preventDefault();
+        canvasRemoveFrame(activeFrame.id);
+        return;
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [tab, canvasUndo, canvasRedo]);
+  }, [
+    tab,
+    canvasUndo,
+    canvasRedo,
+    canvasAddFrame,
+    canvasRemoveFrame,
+    activeFrame.id,
+    selectedEl,
+    canvas.state.frames.length,
+  ]);
 
   const [sidebarWidth, setSidebarWidth] = useState(() => readLSNumber(LS_SIDEBAR, 240));
   const [panelWidth, setPanelWidth] = useState(() => readLSNumber(LS_PANEL, 360));

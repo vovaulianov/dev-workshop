@@ -152,9 +152,11 @@ export function ComponentPreview({
 
   const hint = inspectMode ? (
     <>
-      <kbd className="dw-kbd">space</kbd> + drag to pan ·{" "}
-      <kbd className="dw-kbd">⌘</kbd>+wheel zoom · click element to select ·{" "}
-      <kbd className="dw-kbd">⌥</kbd> for spacing
+      <kbd className="dw-kbd">⌘D</kbd> dup frame ·{" "}
+      <kbd className="dw-kbd">⌫</kbd> delete frame ·{" "}
+      <kbd className="dw-kbd">space</kbd>+drag pan ·{" "}
+      <kbd className="dw-kbd">⌘</kbd>+wheel zoom ·{" "}
+      <kbd className="dw-kbd">⌥</kbd> spacing
     </>
   ) : (
     <>
