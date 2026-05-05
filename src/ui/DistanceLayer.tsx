@@ -18,9 +18,15 @@ interface Rect {
 function getRelativeRect(el: Element, stage: HTMLElement): Rect {
   const a = el.getBoundingClientRect();
   const b = stage.getBoundingClientRect();
-  const top = a.top - b.top + stage.scrollTop;
-  const left = a.left - b.left + stage.scrollLeft;
-  return { top, left, right: left + a.width, bottom: top + a.height, width: a.width, height: a.height };
+  // Recover ancestor-transform scale so the labels & lines stay aligned
+  // when CanvasStage is panned/zoomed. See SelectionOverlay for full notes.
+  const rawScale = stage.offsetWidth > 0 ? b.width / stage.offsetWidth : 1;
+  const scale = rawScale > 0 ? rawScale : 1;
+  const top = (a.top - b.top) / scale + stage.scrollTop;
+  const left = (a.left - b.left) / scale + stage.scrollLeft;
+  const width = a.width / scale;
+  const height = a.height / scale;
+  return { top, left, right: left + width, bottom: top + height, width, height };
 }
 
 interface Segment {

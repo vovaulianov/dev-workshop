@@ -17,11 +17,19 @@ function getRelativeRect(el: Element, stage: HTMLElement): Rect | null {
   const a = el.getBoundingClientRect();
   const b = stage.getBoundingClientRect();
   if (a.width === 0 && a.height === 0) return null;
+  // The stage may be sitting inside a CSS-transformed ancestor (the
+  // CanvasStage pan/zoom container). getBoundingClientRect returns
+  // post-transform pixels; we need pre-transform CSS coords because the
+  // overlay div's `top/left/width/height` are themselves subject to the
+  // same ancestor transform. Compare visual width to layout width to
+  // recover the cumulative scale factor.
+  const scale = stage.offsetWidth > 0 ? b.width / stage.offsetWidth : 1;
+  const safeScale = scale > 0 ? scale : 1;
   return {
-    top: a.top - b.top + stage.scrollTop,
-    left: a.left - b.left + stage.scrollLeft,
-    width: a.width,
-    height: a.height,
+    top: (a.top - b.top) / safeScale + stage.scrollTop,
+    left: (a.left - b.left) / safeScale + stage.scrollLeft,
+    width: a.width / safeScale,
+    height: a.height / safeScale,
   };
 }
 
