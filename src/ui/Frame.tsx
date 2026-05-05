@@ -40,6 +40,11 @@ interface Props {
    *  routes the resulting transform string into the active frame's
    *  overrides as `transform`. */
   onMoveSelected?: (transform: string) => void;
+  /** Drag-session bookends. SelectionOverlay calls onDragStart on
+   *  pointerdown and onDragEnd on pointerup so canvas-state coalesces
+   *  the gesture into a single undo step. */
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
 /**
@@ -60,6 +65,8 @@ export function Frame({
   onActivate,
   onResizeSelected,
   onMoveSelected,
+  onDragStart,
+  onDragEnd,
 }: Props) {
   const [canvas, setCanvas] = useState<HTMLDivElement | null>(null);
   const [hovered, setHovered] = useState<Element | null>(null);
@@ -242,6 +249,8 @@ export function Frame({
             selected={selectedElement}
             onResize={selectedElement ? onResizeSelected : undefined}
             onMove={selectedElement ? onMoveSelected : undefined}
+            onDragStart={onDragStart}
+            onDragEnd={onDragEnd}
           />
         )}
         {isActive && altHeld && selectedElement && hovered && hovered !== selectedElement && (

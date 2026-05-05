@@ -177,6 +177,12 @@ export interface UseCanvasState {
   /** Discard ALL canvas state for this component (back to one default frame). */
   resetAll: () => void;
 
+  /** Coalesce a continuous gesture (resize-handle drag, body drag) into a
+   *  single undo step. Call before the first applyOverride of the gesture
+   *  and again on pointer-up. */
+  beginTransaction: () => void;
+  commitTransaction: () => void;
+
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -447,6 +453,8 @@ export function useCanvasState(componentId: string, defaultVariantIndex: number)
     setZoom,
     pickWinner,
     resetAll,
+    beginTransaction: h.beginTransaction,
+    commitTransaction: h.commitTransaction,
     undo: h.undo,
     redo: h.redo,
     canUndo: h.canUndo,

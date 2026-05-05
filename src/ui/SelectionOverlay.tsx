@@ -19,6 +19,12 @@ interface Props {
    *  selected element should adopt while the user drags it. Frame writes
    *  it into the active frame's overrides on each pointermove tick. */
   onMove?: (transform: string) => void;
+  /** Drag-session bookends. Both resize and body drag fire onDragStart on
+   *  pointerdown and onDragEnd on pointerup so canvas state can coalesce
+   *  the gesture into one undo step (otherwise hundreds of pointermove
+   *  ticks each push a history entry and freeze the page). */
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
 function getRelativeRect(el: Element, stage: HTMLElement): Rect | null {
@@ -73,7 +79,7 @@ function useRect(el: Element | null, stage: HTMLElement | null, tick: number) {
   return rect;
 }
 
-export function SelectionOverlay({ stage, hovered, selected, onResize, onMove }: Props) {
+export function SelectionOverlay({ stage, hovered, selected, onResize, onMove, onDragStart, onDragEnd }: Props) {
   const [tick, setTick] = useState(0);
   useEffect(() => setTick((t) => t + 1), [hovered, selected]);
 
@@ -119,10 +125,23 @@ export function SelectionOverlay({ stage, hovered, selected, onResize, onMove }:
         />
       )}
       {selectedRect && onMove && selected && (
-        <DragHandle rect={selectedRect} scale={safeScale} selected={selected} onMove={onMove} />
+        <DragHandle
+          rect={selectedRect}
+          scale={safeScale}
+          selected={selected}
+          onMove={onMove}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+        />
       )}
       {selectedRect && onResize && (
-        <ResizeHandles rect={selectedRect} scale={safeScale} onResize={onResize} />
+        <ResizeHandles
+          rect={selectedRect}
+          scale={safeScale}
+          onResize={onResize}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+        />
       )}
     </>
   );
@@ -133,17 +152,22 @@ function DragHandle({
   scale,
   selected,
   onMove,
+  onDragStart,
+  onDragEnd,
 }: {
   rect: Rect;
   scale: number;
   selected: Element;
   onMove: (transform: string) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }) {
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     const target = e.currentTarget;
     target.setPointerCapture(e.pointerId);
+    onDragStart?.();
 
     const startMouseX = e.clientX;
     const startMouseY = e.clientY;
@@ -178,6 +202,7 @@ function DragHandle({
       target.removeEventListener("pointermove", onPointerMove);
       target.removeEventListener("pointerup", onPointerUp);
       target.removeEventListener("pointercancel", onPointerUp);
+      onDragEnd?.();
     };
     target.addEventListener("pointermove", onPointerMove);
     target.addEventListener("pointerup", onPointerUp);
@@ -223,10 +248,14 @@ function ResizeHandles({
   rect,
   scale,
   onResize,
+  onDragStart,
+  onDragEnd,
 }: {
   rect: Rect;
   scale: number;
   onResize: (next: { width: number; height: number }) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }) {
   // Render handles at constant 10px on screen regardless of zoom by
   // inversely scaling their CSS size. At zoom=0.25 the CSS size is 40px;
@@ -253,6 +282,7 @@ function ResizeHandles({
     e.stopPropagation();
     const target = e.currentTarget;
     target.setPointerCapture(e.pointerId);
+    onDragStart?.();
     const startWidth = rect.width;
     const startHeight = rect.height;
     const startMouseX = e.clientX;
@@ -282,6 +312,7 @@ function ResizeHandles({
       target.removeEventListener("pointermove", onMove);
       target.removeEventListener("pointerup", onUp);
       target.removeEventListener("pointercancel", onUp);
+      onDragEnd?.();
     };
     target.addEventListener("pointermove", onMove);
     target.addEventListener("pointerup", onUp);

@@ -34,7 +34,16 @@ export function CanvasStage({ entry, argsOverride, canvas, width, onSelectElemen
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [altHeld, setAltHeld] = useState(false);
   const [panning, setPanning] = useState(false);
-  const { state, setPan, setZoom, setSelection, setActiveFrame, applyOverride } = canvas;
+  const {
+    state,
+    setPan,
+    setZoom,
+    setSelection,
+    setActiveFrame,
+    applyOverride,
+    beginTransaction,
+    commitTransaction,
+  } = canvas;
 
   // Live resize callback for the selected element in the active frame.
   // Writes `width`/`height` overrides on each pointermove tick. Stable
@@ -248,6 +257,8 @@ export function CanvasStage({ entry, argsOverride, canvas, width, onSelectElemen
               onActivate={() => setActiveFrame(f.id)}
               onResizeSelected={onResizeSelected}
               onMoveSelected={onMoveSelected}
+              onDragStart={beginTransaction}
+              onDragEnd={commitTransaction}
             />
           ))}
         </div>
