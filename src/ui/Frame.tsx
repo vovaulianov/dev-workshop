@@ -33,6 +33,9 @@ interface Props {
   /** Click on a non-active frame's body promotes it to active (multi-frame).
    *  Phase 1 had only one frame so this was a no-op; Phase 2 wires it up. */
   onActivate: () => void;
+  /** Live resize callback fired during a handle drag. CanvasStage routes
+   *  this into the active frame's overrides as `width`/`height`. */
+  onResizeSelected?: (next: { width: number; height: number }) => void;
 }
 
 /**
@@ -51,6 +54,7 @@ export function Frame({
   altHeld,
   width,
   onActivate,
+  onResizeSelected,
 }: Props) {
   const [canvas, setCanvas] = useState<HTMLDivElement | null>(null);
   const [hovered, setHovered] = useState<Element | null>(null);
@@ -231,6 +235,7 @@ export function Frame({
             stage={canvas}
             hovered={hovered && hovered !== selectedElement ? hovered : null}
             selected={selectedElement}
+            onResize={selectedElement ? onResizeSelected : undefined}
           />
         )}
         {isActive && altHeld && selectedElement && hovered && hovered !== selectedElement && (

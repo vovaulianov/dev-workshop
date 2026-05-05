@@ -34,7 +34,20 @@ export function CanvasStage({ entry, argsOverride, canvas, width, onSelectElemen
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [altHeld, setAltHeld] = useState(false);
   const [panning, setPanning] = useState(false);
-  const { state, setPan, setZoom, setSelection, setActiveFrame } = canvas;
+  const { state, setPan, setZoom, setSelection, setActiveFrame, applyOverride } = canvas;
+
+  // Live resize callback for the selected element in the active frame.
+  // Writes `width`/`height` overrides on each pointermove tick. Stable
+  // identity so SelectionOverlay's pointer handlers don't churn.
+  const onResizeSelected = useCallback(
+    (next: { width: number; height: number }) => {
+      const loc = state.selection.sourceLoc;
+      if (!loc) return;
+      applyOverride(state.activeFrameId, loc, "width", `${next.width}px`);
+      applyOverride(state.activeFrameId, loc, "height", `${next.height}px`);
+    },
+    [applyOverride, state.activeFrameId, state.selection.sourceLoc],
+  );
 
   // Modifier-key tracking — for Distance layer (⌥) and Space-pan.
   useEffect(() => {
@@ -220,6 +233,7 @@ export function CanvasStage({ entry, argsOverride, canvas, width, onSelectElemen
               altHeld={altHeld}
               width={width}
               onActivate={() => setActiveFrame(f.id)}
+              onResizeSelected={onResizeSelected}
             />
           ))}
         </div>
