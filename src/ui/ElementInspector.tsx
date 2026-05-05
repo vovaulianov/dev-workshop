@@ -3,6 +3,50 @@ import { patchStyle } from "../lib/devApi";
 import type { ElementSource } from "../lib/fiberUtils";
 import { describeElement } from "../lib/fiberUtils";
 import { SmartInput } from "./SmartInput";
+import { Slider } from "./Slider";
+
+/** Per-property slider ranges. Anything not listed falls back to SmartInput.
+ *  `unit` is the suffix appended on output and stripped on input — empty
+ *  string for unitless props (font-weight, line-height, opacity). */
+interface SliderRange {
+  min: number;
+  max: number;
+  step?: number;
+  unit: string;
+  precision?: number;
+}
+const SLIDER_RANGES: Record<string, SliderRange> = {
+  padding: { min: 0, max: 64, unit: "px" },
+  paddingTop: { min: 0, max: 64, unit: "px" },
+  paddingRight: { min: 0, max: 64, unit: "px" },
+  paddingBottom: { min: 0, max: 64, unit: "px" },
+  paddingLeft: { min: 0, max: 64, unit: "px" },
+  margin: { min: -32, max: 64, unit: "px" },
+  gap: { min: 0, max: 64, unit: "px" },
+  borderRadius: { min: 0, max: 32, unit: "px" },
+  fontSize: { min: 8, max: 48, unit: "px" },
+  fontWeight: { min: 100, max: 900, step: 100, unit: "" },
+  lineHeight: { min: 0.8, max: 2.5, step: 0.05, unit: "", precision: 2 },
+  letterSpacing: { min: -2, max: 4, step: 0.05, unit: "px", precision: 2 },
+  borderWidth: { min: 0, max: 8, step: 0.5, unit: "px", precision: 1 },
+  opacity: { min: 0, max: 1, step: 0.05, unit: "", precision: 2 },
+};
+
+const NUMBER_UNIT_RE = /^(-?\d*\.?\d+)([a-z%]*)\s*$/i;
+
+function parseCssValue(s: string): { num: number; unit: string } | null {
+  const m = s.trim().match(NUMBER_UNIT_RE);
+  if (!m) return null;
+  const n = parseFloat(m[1]!);
+  if (!Number.isFinite(n)) return null;
+  return { num: n, unit: m[2] ?? "" };
+}
+
+function trimNumber(n: number, precision = 0): string {
+  if (precision === 0) return String(Math.round(n));
+  // Trim trailing zeros (e.g. 1.50 → 1.5, 1.00 → 1)
+  return parseFloat(n.toFixed(precision)).toString();
+}
 
 type Overrides = Record<string, string | null>;
 
@@ -233,16 +277,27 @@ function AxisRow({ axis, element, overrides, onChange }: { axis: "width" | "heig
     else onChange(def, `${Math.round(parseFloat(computed) || 0)}px`);
   };
   return (
-    <div>
-      <div style={{ marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <label className="dw-mono" style={{ fontSize: 10, color: "#404040" }}>{axis}</label>
-        <div style={{ display: "flex", gap: 2 }}>
-          {(["fill", "hug", "fixed"] as SizingMode[]).map((m) => (
-            <button key={m} onClick={() => setMode(m)} className="dw-pill" data-active={mode === m ? "true" : "false"} style={{ padding: "2px 6px", fontSize: 9 }}>{m}</button>
-          ))}
-        </div>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 4px" }}>
+      <label style={{ flexShrink: 0, width: 64, paddingLeft: 12, fontFamily: "var(--dw-font)", fontSize: 12, fontWeight: 500, color: "var(--dw-text-secondary)" }}>{axis}</label>
+      <div className="dw-segments" style={{ flexShrink: 0 }}>
+        {(["fill", "hug", "fixed"] as SizingMode[]).map((m) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className="dw-segment"
+            data-active={mode === m ? "true" : "false"}
+            style={{ minWidth: 44, padding: "0 10px", height: 26, fontSize: 12 }}
+          >
+            {m}
+          </button>
+        ))}
       </div>
-      {mode === "fixed" && <SmartInput value={value} onChange={(v) => onChange(def, v)} className="dw-input dw-input-sm" />}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {mode === "fixed"
+          ? <SmartInput value={value} onChange={(v) => onChange(def, v)} className="dw-input-md" />
+          : <input className="dw-input-md" value={value} readOnly tabIndex={-1} style={{ opacity: 0.6, cursor: "default" }} />
+        }
+      </div>
     </div>
   );
 }
@@ -251,37 +306,123 @@ function Row({ def, element, override, onChange }: { def: PropDef; element: Elem
   const computed = computedValue(element, def.cssProp);
   const value = override !== undefined ? override ?? "" : computed;
   const dirty = override !== undefined;
+
+  // Slider applies to numeric kinds with a known range. The slider has its
+  // own inline label, so we drop the 100px label cell and let it span.
+  const range = SLIDER_RANGES[def.key];
+  const useSlider = !!range && def.kind !== "color" && def.kind !== "align" && def.kind !== "shadow";
+
+  if (useSlider) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 6, borderRadius: 4, background: dirty ? "#fff4f4" : "transparent", padding: "2px 4px" }}>
+        <CssSlider def={def} value={value} range={range!} onChange={onChange} />
+        {dirty
+          ? <button onClick={() => onChange(null)} className="dw-ghost" title="reset">×</button>
+          : <span style={{ width: 16 }} />}
+      </div>
+    );
+  }
+
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "100px 1fr auto", alignItems: "center", gap: 8, borderRadius: 4, background: dirty ? "#fff4f4" : "transparent", padding: "2px 4px" }}>
-      <label className="dw-mono" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 10, color: "#404040" }}>{def.label}</label>
+    <div style={{ display: "grid", gridTemplateColumns: "108px 1fr auto", alignItems: "center", gap: 8, borderRadius: 4, background: dirty ? "#fff4f4" : "transparent", padding: "2px 4px" }}>
+      {/* paddingLeft: 12 mirrors the slider's internal label inset so labels
+          line up vertically across slider rows and non-slider rows. */}
+      <label style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontFamily: "var(--dw-font)", fontSize: 12, fontWeight: 500, color: "var(--dw-text-secondary)", paddingLeft: 12 }}>{def.label}</label>
       <div style={{ minWidth: 0 }}><Control def={def} value={value} onChange={onChange} /></div>
       {dirty ? <button onClick={() => onChange(null)} className="dw-ghost" title="reset">×</button> : <span style={{ width: 16 }} />}
     </div>
   );
 }
 
+function CssSlider({ def, value, range, onChange }: { def: PropDef; value: string; range: SliderRange; onChange: (v: string) => void }) {
+  const parsed = parseCssValue(value);
+  const num = parsed?.num ?? range.min;
+  const currentUnit = parsed?.unit ?? range.unit;
+
+  const formatValue = (v: number): string => {
+    const text = trimNumber(v, range.precision ?? 0);
+    return text + (currentUnit || range.unit);
+  };
+
+  const parseValue = (s: string): number | null => {
+    const p = parseCssValue(s);
+    return p?.num ?? null;
+  };
+
+  return (
+    <Slider
+      label={def.label}
+      value={Math.max(range.min, Math.min(range.max, num))}
+      min={range.min}
+      max={range.max}
+      step={range.step}
+      format={formatValue}
+      parse={parseValue}
+      onChange={(v) => {
+        const text = trimNumber(v, range.precision ?? 0);
+        onChange(text + (currentUnit || range.unit));
+      }}
+    />
+  );
+}
+
+function AlignIcon({ kind }: { kind: "left" | "center" | "right" | "justify" }) {
+  const lines: Record<string, Array<[number, number, number]>> = {
+    // [y, x, width] — 4 lines top to bottom
+    left:    [[3, 1, 10], [6, 1, 6], [9, 1, 8], [12, 1, 5]],
+    center:  [[3, 2, 10], [6, 4, 6], [9, 3, 8], [12, 5, 4]],
+    right:   [[3, 3, 10], [6, 7, 6], [9, 5, 8], [12, 8, 5]],
+    justify: [[3, 1, 12], [6, 1, 12], [9, 1, 12], [12, 1, 12]],
+  };
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      {lines[kind]!.map(([y, x, w], i) => (
+        <rect key={i} x={x} y={y} width={w} height="1.4" rx="0.7" fill="currentColor" />
+      ))}
+    </svg>
+  );
+}
+
 function Control({ def, value, onChange }: { def: PropDef; value: string; onChange: (v: string) => void }) {
   if (def.kind === "color") {
+    // Always display as HEX. Computed values come back as rgb() — convert
+    // before showing. The native picker emits HEX naturally.
     const hex = rgbToHex(value) ?? (value.startsWith("#") ? value : "#000000");
+    const display = value.startsWith("#") ? value : (rgbToHex(value) ?? value);
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-        <input type="color" value={hex} onChange={(e) => onChange(e.target.value)} style={{ height: 20, width: 20, flexShrink: 0, cursor: "pointer", borderRadius: 4, border: "1px solid #e5e5e5", background: "white", padding: 0 }} />
-        <SmartInput plain value={value} onChange={onChange} placeholder="#hex / rgb / var()" className="dw-input dw-input-sm" />
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <input
+          type="color"
+          value={hex}
+          onChange={(e) => onChange(e.target.value)}
+          style={{ height: 32, width: 32, flexShrink: 0, cursor: "pointer", borderRadius: 8, border: "1px solid #e5e5e5", background: "white", padding: 0, overflow: "hidden" }}
+        />
+        <SmartInput plain value={display} onChange={onChange} placeholder="#hex / rgb / var()" className="dw-input-md" />
       </div>
     );
   }
   if (def.kind === "align") {
-    const opts = [{ v: "left", label: "L" }, { v: "center", label: "C" }, { v: "right", label: "R" }, { v: "justify", label: "J" }];
+    const opts: Array<"left" | "center" | "right" | "justify"> = ["left", "center", "right", "justify"];
     return (
-      <div style={{ display: "flex", gap: 2 }}>
+      <div className="dw-segments" style={{ width: "100%" }}>
         {opts.map((o) => (
-          <button key={o.v} onClick={() => onChange(o.v)} className="dw-pill" data-active={value === o.v ? "true" : "false"} style={{ height: 24, width: 24, padding: 0, justifyContent: "center", display: "flex", alignItems: "center" }}>{o.label}</button>
+          <button
+            key={o}
+            onClick={() => onChange(o)}
+            className="dw-segment"
+            data-active={value === o ? "true" : "false"}
+            style={{ height: 26, padding: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+            title={o}
+            aria-label={o}
+          >
+            <AlignIcon kind={o} />
+          </button>
         ))}
       </div>
     );
   }
   if (def.kind === "shadow") {
-    return <SmartInput plain value={value === "none" ? "" : value} onChange={(v) => onChange(v || "none")} placeholder="x y blur color" className="dw-input dw-input-sm" />;
+    return <SmartInput plain value={value === "none" ? "" : value} onChange={(v) => onChange(v || "none")} placeholder="x y blur color" className="dw-input-md" />;
   }
-  return <SmartInput value={value} onChange={onChange} className="dw-input dw-input-sm" />;
+  return <SmartInput value={value} onChange={onChange} className="dw-input-md" />;
 }

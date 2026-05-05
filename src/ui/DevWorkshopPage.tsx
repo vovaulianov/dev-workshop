@@ -200,6 +200,55 @@ const STYLES = `
   color: white;
 }
 
+/* Medium pill — 32px tall, 12px mono. Used in element-tab controls
+   (text-align, fill/hug/fixed). Same family/size as the slider value
+   so the panel reads as one consistent set of controls. */
+[data-dev-workshop] .dw-pill-md {
+  appearance: none;
+  box-sizing: border-box;
+  cursor: pointer;
+  border: none;
+  margin: 0;
+  background: var(--dw-bg-input);
+  color: var(--dw-text-muted);
+  border-radius: 6px;
+  padding: 0 10px;
+  height: 32px;
+  font-family: var(--dw-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  transition: background 120ms, color 120ms;
+}
+[data-dev-workshop] .dw-pill-md:hover { background: var(--dw-bg-input-hover); }
+[data-dev-workshop] .dw-pill-md[data-active="true"] {
+  background: var(--dw-bg-active);
+  color: white;
+}
+
+/* Medium input — 32px tall, 12px mono. Same height as slider for
+   consistent rows in the element tab. */
+[data-dev-workshop] .dw-input-md {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  border: none;
+  outline: none;
+  margin: 0;
+  background: var(--dw-bg-input);
+  border-radius: 8px;
+  padding: 0 12px;
+  height: 32px;
+  font-family: var(--dw-font-mono);
+  font-size: 12px;
+  line-height: 1;
+  color: var(--dw-text);
+  width: 100%;
+  transition: background 120ms;
+}
+[data-dev-workshop] .dw-input-md:focus { background: var(--dw-bg-input-hover); }
+[data-dev-workshop] .dw-input-md::placeholder { color: var(--dw-text-placeholder); }
+
 [data-dev-workshop] .dw-tab {
   appearance: none;
   box-sizing: border-box;
@@ -327,6 +376,115 @@ const STYLES = `
   background: var(--dw-bg);
   color: var(--dw-text);
   box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 1px 3px rgba(0,0,0,0.06);
+}
+
+/* Slider — full-bleed track with inline label/value, hover ticks, decile-snap.
+   See Slider.tsx for behavior; styles cover the resting and hover/active
+   states. */
+[data-dev-workshop] .dw-slider {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  height: 32px;
+  border-radius: 8px;
+  background: #f1f1f1;
+  cursor: ew-resize;
+  user-select: none;
+  overflow: hidden;
+  transition: background 120ms;
+}
+[data-dev-workshop] .dw-slider[data-hover="true"] { background: #ececec; }
+[data-dev-workshop] .dw-slider[data-active="true"] { background: #e5e5e5; }
+
+[data-dev-workshop] .dw-slider-fill {
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  background: #d4d4d4;
+  pointer-events: none;
+  transition: background 120ms;
+}
+[data-dev-workshop] .dw-slider[data-hover="true"] .dw-slider-fill { background: #c4c4c4; }
+[data-dev-workshop] .dw-slider[data-active="true"] .dw-slider-fill { background: #b8b8b8; }
+
+[data-dev-workshop] .dw-slider-handle {
+  position: absolute;
+  top: 6px; bottom: 6px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: #ffffff;
+  pointer-events: none;
+  transform-origin: center;
+  transition: transform 180ms cubic-bezier(0.2, 0, 0.15, 1.6), opacity 120ms;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  opacity: 0;
+}
+[data-dev-workshop] .dw-slider-handle[data-visible="true"] { opacity: 1; }
+
+[data-dev-workshop] .dw-slider-ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms;
+}
+[data-dev-workshop] .dw-slider-ticks[data-visible="true"] { opacity: 1; }
+[data-dev-workshop] .dw-slider-tick {
+  position: absolute;
+  top: 50%;
+  width: 1px;
+  height: 6px;
+  margin-left: -0.5px;
+  background: rgba(0,0,0,0.16);
+  transform: translateY(-50%);
+}
+
+[data-dev-workshop] .dw-slider-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  pointer-events: none;
+  gap: 8px;
+}
+[data-dev-workshop] .dw-slider-label {
+  font-family: var(--dw-font);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dw-text-secondary);
+  pointer-events: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+[data-dev-workshop] .dw-slider-value {
+  font-family: var(--dw-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dw-text);
+  pointer-events: auto;
+  cursor: text;
+  white-space: nowrap;
+}
+[data-dev-workshop] .dw-slider-input {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  outline: none;
+  background: white;
+  border-radius: 4px;
+  margin: 0;
+  padding: 2px 6px;
+  font-family: var(--dw-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dw-text);
+  width: 84px;
+  text-align: right;
+  pointer-events: auto;
+  box-shadow: 0 0 0 1.5px var(--dw-accent);
 }
 
 [data-dev-workshop] .dw-section-label {

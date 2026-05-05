@@ -123,42 +123,72 @@ interface StubResult {
 }
 
 /**
- * Walks a Babel AST looking for a default export that's a React component.
- * Returns the component name (used for the stub's `title`) or null if the
- * file doesn't look component-shaped.
+ * Walks a Babel AST looking for an exported React component. Returns
+ * `{ name, isDefault }` where `isDefault` controls how the stub imports it
+ * (default vs. named). Returns null if no plausible component export exists.
  *
- * Heuristic: default-exported function/arrow/identifier whose name starts
- * with a capital letter. Doesn't try to verify JSX returns — false positives
- * are tolerable since the "Generate stubs" flow is opt-in.
+ * Heuristic order:
+ *   1. `export default Foo` (function, class, or identifier)
+ *   2. `export function Foo` / `export class Foo` / `export const Foo`
+ *      where Foo starts with a capital letter
+ *   3. If multiple named exports match, prefer the one whose name equals
+ *      the file's stem (e.g. `HotelCard.tsx` → exported `HotelCard`)
  */
-function findDefaultExportComponent(ast: ParseResult<File>): string | null {
-  const namedDecls = new Map<string, "fn" | "var" | "class">();
+function findComponentExport(ast: ParseResult<File>, fileStem: string): { name: string; isDefault: boolean } | null {
+  const namedDecls = new Map<string, true>();
   for (const node of ast.program.body) {
-    if (node.type === "FunctionDeclaration" && node.id) namedDecls.set(node.id.name, "fn");
-    else if (node.type === "ClassDeclaration" && node.id) namedDecls.set(node.id.name, "class");
+    if (node.type === "FunctionDeclaration" && node.id) namedDecls.set(node.id.name, true);
+    else if (node.type === "ClassDeclaration" && node.id) namedDecls.set(node.id.name, true);
     else if (node.type === "VariableDeclaration") {
       for (const d of node.declarations) {
-        if (d.id.type === "Identifier") namedDecls.set(d.id.name, "var");
+        if (d.id.type === "Identifier") namedDecls.set(d.id.name, true);
       }
     }
   }
+
+  // Pass 1: default export
   for (const node of ast.program.body) {
     if (node.type === "ExportDefaultDeclaration") {
       const decl = node.declaration as any;
-      if (decl?.type === "FunctionDeclaration" && decl.id?.name) {
-        if (/^[A-Z]/.test(decl.id.name)) return decl.id.name;
-      } else if (decl?.type === "ClassDeclaration" && decl.id?.name) {
-        if (/^[A-Z]/.test(decl.id.name)) return decl.id.name;
-      } else if (decl?.type === "Identifier") {
-        const name = decl.name;
-        if (/^[A-Z]/.test(name) && namedDecls.has(name)) return name;
-      } else if (decl?.type === "ArrowFunctionExpression" || decl?.type === "FunctionExpression") {
-        // Anonymous default export — fall through, we have no name to use
-        return null;
+      if (decl?.type === "FunctionDeclaration" && decl.id?.name && /^[A-Z]/.test(decl.id.name)) {
+        return { name: decl.id.name, isDefault: true };
+      }
+      if (decl?.type === "ClassDeclaration" && decl.id?.name && /^[A-Z]/.test(decl.id.name)) {
+        return { name: decl.id.name, isDefault: true };
+      }
+      if (decl?.type === "Identifier" && /^[A-Z]/.test(decl.name) && namedDecls.has(decl.name)) {
+        return { name: decl.name, isDefault: true };
       }
     }
   }
-  return null;
+
+  // Pass 2: named exports starting with a capital letter
+  const named: string[] = [];
+  for (const node of ast.program.body) {
+    if (node.type === "ExportNamedDeclaration" && node.declaration) {
+      const d = node.declaration as any;
+      if (d.type === "FunctionDeclaration" && d.id?.name && /^[A-Z]/.test(d.id.name)) named.push(d.id.name);
+      else if (d.type === "ClassDeclaration" && d.id?.name && /^[A-Z]/.test(d.id.name)) named.push(d.id.name);
+      else if (d.type === "VariableDeclaration") {
+        for (const v of d.declarations) {
+          if (v.id?.type === "Identifier" && /^[A-Z]/.test(v.id.name)) named.push(v.id.name);
+        }
+      }
+    } else if (node.type === "ExportNamedDeclaration" && node.specifiers?.length) {
+      // export { Foo } or export { Foo as Bar }
+      for (const spec of node.specifiers) {
+        if (spec.type === "ExportSpecifier" && spec.exported.type === "Identifier") {
+          const name = spec.exported.name;
+          if (/^[A-Z]/.test(name)) named.push(name);
+        }
+      }
+    }
+  }
+
+  if (named.length === 0) return null;
+  // Prefer name matching file stem; otherwise first capitalized export
+  const stemMatch = named.find((n) => n === fileStem);
+  return { name: stemMatch ?? named[0]!, isDefault: false };
 }
 
 /**
@@ -188,19 +218,23 @@ function generateStub(absComponentPath: string, projectRoot: string): { status: 
     return { status: "skipped", reason: `parse error: ${String(err)}` };
   }
 
-  const componentName = findDefaultExportComponent(ast);
-  if (!componentName) return { status: "skipped", reason: "no named default export found" };
+  const exported = findComponentExport(ast, stem);
+  if (!exported) return { status: "skipped", reason: "no exported component found" };
 
   // Build a short relative path from project root for the title category
   const rel = relative(projectRoot, dir).split("/").filter(Boolean);
   const category = rel.length > 0 ? rel[rel.length - 1] : "components";
-  const title = `${category}/${componentName}`;
+  const title = `${category}/${exported.name}`;
 
-  const stub = `import ${componentName} from "./${stem}";
+  const importLine = exported.isDefault
+    ? `import ${exported.name} from "./${stem}";`
+    : `import { ${exported.name} } from "./${stem}";`;
+
+  const stub = `${importLine}
 
 export default {
   title: "${title}",
-  component: ${componentName},
+  component: ${exported.name},
 };
 
 export const Default = {

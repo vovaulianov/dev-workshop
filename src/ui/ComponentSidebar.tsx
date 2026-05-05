@@ -45,7 +45,6 @@ function VariantsIcon({ expanded }: { expanded: boolean }) {
 }
 
 export function ComponentSidebar({ entries, selectedId, variantIndex, variantExplicit, width, onSelect }: Props) {
-  const [query, setQuery] = useState("");
   // Expanded set persists across selection — switching components doesn't
   // collapse previously-expanded ones. Auto-adds the current selection so
   // its variants are visible without a manual toggle.
@@ -56,15 +55,7 @@ export function ComponentSidebar({ entries, selectedId, variantIndex, variantExp
     setExpanded((prev) => (prev.has(selectedId) ? prev : new Set([...prev, selectedId])));
   }, [selectedId]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return entries;
-    return entries.filter(
-      (e) => e.name.toLowerCase().includes(q) || e.category.toLowerCase().includes(q) || e.variants.some((v) => v.name.toLowerCase().includes(q)),
-    );
-  }, [entries, query]);
-
-  const groups = useMemo(() => groupByCategory(filtered), [filtered]);
+  const groups = useMemo(() => groupByCategory(entries), [entries]);
   const categoryOrder = Object.keys(groups).sort();
 
   const toggleExpanded = (id: string) => {
@@ -86,17 +77,7 @@ export function ComponentSidebar({ entries, selectedId, variantIndex, variantExp
         </div>
       </div>
 
-      <div style={{ borderBottom: "1px solid #f1f1f1", padding: "8px 12px" }}>
-        <input
-          type="search"
-          placeholder="Search components…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="dw-search"
-        />
-      </div>
-
-      <nav style={{ flex: 1, overflowY: "auto", padding: "8px 8px" }}>
+      <nav className="dw-scroll" style={{ flex: 1, padding: "8px 8px" }}>
         {categoryOrder.length === 0 && (
           <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12, color: "#b3b3b3" }}>Nothing matches</div>
         )}
