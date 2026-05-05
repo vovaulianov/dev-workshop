@@ -191,12 +191,13 @@ export function Frame({
         data-dw-frame-id={frame.id}
         style={{
           position: "relative",
-          background: "white",
+          // Transparent canvas with dashed gray outline — the rendered
+          // component sits on top of the workshop's gray bg, mimicking
+          // a Figma frame. Active state uses a darker dash so multiple
+          // frames stay distinguishable in Phase 2.
+          background: "transparent",
+          border: isActive ? "1px dashed #909090" : "1px dashed #d4d4d4",
           borderRadius: 4,
-          // Active frame gets a subtle outline so designer knows where edits land
-          boxShadow: isActive
-            ? "0 0 0 1px var(--dw-accent), 0 4px 24px rgba(0,0,0,0.06)"
-            : "0 0 0 1px var(--dw-border), 0 2px 8px rgba(0,0,0,0.04)",
           color: "#101114",
           ...(width === "full" ? { width: 430 } : { width: `${width}px` }),
           minHeight: 100,

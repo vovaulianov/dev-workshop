@@ -39,8 +39,13 @@ interface Props {
   inspectorOverrides: StyleOverride;
   /** Update one CSS property in the active frame's overrides for the selected loc. */
   onInspectorChange: (cssProp: string, value: string | null) => void;
-  /** Drop ALL overrides for the selected loc. */
+  /** Drop ALL overrides for the selected loc only. */
   onInspectorDiscard: () => void;
+  /** Drop ALL overrides across every loc in the active frame. */
+  onInspectorDiscardAll: () => void;
+  /** Total count of source locations in the active frame that carry at least
+   *  one override — used to label the discard fallback button. */
+  frameOverrideLocCount: number;
 }
 
 export function StylePanel({
@@ -56,6 +61,8 @@ export function StylePanel({
   inspectorOverrides,
   onInspectorChange,
   onInspectorDiscard,
+  onInspectorDiscardAll,
+  frameOverrideLocCount,
 }: Props) {
   return (
     <aside className="dw-card" style={{ display: "flex", height: "100%", minWidth: 0, flex: 1, flexDirection: "column", color: "#101114" }}>
@@ -78,9 +85,14 @@ export function StylePanel({
             overrides={inspectorOverrides}
             onChange={onInspectorChange}
             onDiscard={onInspectorDiscard}
+            onDiscardAll={onInspectorDiscardAll}
+            frameOverrideLocCount={frameOverrideLocCount}
           />
         ) : (
-          <ElementEmptyState />
+          <ElementEmptyState
+            frameOverrideLocCount={frameOverrideLocCount}
+            onDiscardAll={onInspectorDiscardAll}
+          />
         )
       )}
       {tab === "props" && (
@@ -92,17 +104,47 @@ export function StylePanel({
   );
 }
 
-function ElementEmptyState() {
+function ElementEmptyState({
+  frameOverrideLocCount,
+  onDiscardAll,
+}: {
+  frameOverrideLocCount: number;
+  onDiscardAll: () => void;
+}) {
   return (
-    <div style={{ display: "flex", flex: 1, flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, textAlign: "center", gap: 10 }}>
-      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-        <rect x="4" y="4" width="20" height="20" rx="3" stroke="#b3b3b3" strokeWidth="1.5" strokeDasharray="3 3" />
-        <path d="M22 22 L32 28 L26 30 L28 36 L24 32 L22 38 Z" fill="#101114" stroke="white" strokeWidth="1" strokeLinejoin="round" />
-      </svg>
-      <div style={{ fontSize: 13, color: "#101114", fontWeight: 600 }}>Click any element on the canvas</div>
-      <div style={{ fontSize: 11, color: "#808080", lineHeight: 1.5, maxWidth: 220 }}>
-        No modifier keys needed while you're on this tab. Hold <kbd className="dw-kbd">⌥</kbd> to also see spacing.
+    <div style={{ display: "flex", flex: 1, flexDirection: "column", overflow: "hidden" }}>
+      <div
+        style={{
+          display: "flex",
+          flex: 1,
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          textAlign: "center",
+          gap: 10,
+        }}
+      >
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <rect x="4" y="4" width="20" height="20" rx="3" stroke="#b3b3b3" strokeWidth="1.5" strokeDasharray="3 3" />
+          <path d="M22 22 L32 28 L26 30 L28 36 L24 32 L22 38 Z" fill="#101114" stroke="white" strokeWidth="1" strokeLinejoin="round" />
+        </svg>
+        <div style={{ fontSize: 13, color: "#101114", fontWeight: 600 }}>Click any element on the canvas</div>
+        <div style={{ fontSize: 11, color: "#808080", lineHeight: 1.5, maxWidth: 220 }}>
+          No modifier keys needed while you're on this tab. Hold <kbd className="dw-kbd">⌥</kbd> to also see spacing.
+        </div>
       </div>
+      {frameOverrideLocCount > 0 && (
+        <div style={{ borderTop: "1px solid #e5e5e5", padding: 12 }}>
+          <div style={{ marginBottom: 8, fontSize: 10, color: "var(--dw-text-muted)", lineHeight: 1.4 }}>
+            This frame has overrides on {frameOverrideLocCount} element
+            {frameOverrideLocCount === 1 ? "" : "s"}.
+          </div>
+          <button onClick={onDiscardAll} className="dw-btn-secondary" style={{ width: "100%" }}>
+            Discard all overrides ({frameOverrideLocCount})
+          </button>
+        </div>
+      )}
     </div>
   );
 }

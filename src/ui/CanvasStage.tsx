@@ -79,12 +79,13 @@ export function CanvasStage({ entry, argsOverride, canvas, width, onSelectElemen
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
         // Zoom — exp curve so wheel feels symmetric in/out. Coefficient
-        // 0.005 matches Figma's responsiveness on a typical trackpad.
+        // 0.01 hits the floor (25%) in 2-3 wheel events; matches Figma's
+        // aggressive zoom on a typical trackpad.
         const rect = stage.getBoundingClientRect();
         const cursorX = e.clientX - rect.left;
         const cursorY = e.clientY - rect.top;
         const oldZoom = state.zoom;
-        const factor = Math.exp(-e.deltaY * 0.005);
+        const factor = Math.exp(-e.deltaY * 0.01);
         const newZoom = Math.max(0.25, Math.min(4, oldZoom * factor));
         if (newZoom === oldZoom) return;
         // Solve: cursor_world = (cursor - pan) / zoom must stay constant.

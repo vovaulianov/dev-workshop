@@ -129,6 +129,12 @@ export interface UseCanvasState {
   /** Drop all overrides on this loc within the active frame (Discard for current selection). */
   clearOverridesForLoc: (frameId: FrameId, srcLoc: SourceLoc) => void;
 
+  /** Drop EVERY override across all source locations in this frame. Used by
+   *  the inspector's "Discard all overrides" fallback when the user lands on
+   *  an element with nothing to discard locally but the frame has work
+   *  elsewhere. */
+  clearAllOverrides: (frameId: FrameId) => void;
+
   /** Update selection — single sourceLoc per frame in Phase 1. */
   setSelection: (sel: { frameId: FrameId; sourceLoc: SourceLoc | null }) => void;
 
@@ -236,6 +242,18 @@ export function useCanvasState(componentId: string, defaultVariantIndex: number)
     [setOverridesForLoc],
   );
 
+  const clearAllOverrides = useCallback<UseCanvasState["clearAllOverrides"]>(
+    (frameId) => {
+      h.set((curr) => ({
+        ...curr,
+        frames: curr.frames.map((f) =>
+          f.id === frameId ? { ...f, overrides: {} } : f,
+        ),
+      }));
+    },
+    [h],
+  );
+
   const setSelection = useCallback<UseCanvasState["setSelection"]>(
     (sel) => h.set((curr) => ({ ...curr, selection: sel, activeFrameId: sel.frameId })),
     [h],
@@ -298,6 +316,7 @@ export function useCanvasState(componentId: string, defaultVariantIndex: number)
     applyOverride,
     setOverridesForLoc,
     clearOverridesForLoc,
+    clearAllOverrides,
     setSelection,
     setPan,
     setZoom,

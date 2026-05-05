@@ -59,8 +59,13 @@ interface Props {
   overrides: Overrides;
   /** Update one CSS property in the active frame's overrides. `null` removes. */
   onChange: (cssProp: string, value: string | null) => void;
-  /** Drop ALL overrides for the selected loc (Discard button). */
+  /** Drop overrides for the selected loc only. */
   onDiscard: () => void;
+  /** Drop overrides for EVERY loc in the active frame (fallback when the
+   *  current loc has no overrides but the frame does). */
+  onDiscardAll: () => void;
+  /** Total locs in active frame with at least one non-null override prop. */
+  frameOverrideLocCount: number;
 }
 
 interface PropDef {
@@ -133,6 +138,8 @@ export function ElementInspector({
   overrides,
   onChange,
   onDiscard,
+  onDiscardAll,
+  frameOverrideLocCount,
 }: Props) {
   // Force re-render when DOM mutates (e.g. story re-renders, frame re-applies
   // overrides) so computed values stay fresh.
@@ -416,14 +423,22 @@ export function ElementInspector({
           Changes affect this frame only. Use <strong>Pick winner</strong> on the canvas to commit
           to source.
         </div>
-        <button
-          onClick={onDiscard}
-          disabled={!hasDirty}
-          className="dw-btn-secondary"
-          style={{ width: "100%" }}
-        >
-          {hasDirty ? `Discard ${dirtyCount} override${dirtyCount === 1 ? "" : "s"}` : "Discard"}
-        </button>
+        {hasDirty ? (
+          <button onClick={onDiscard} className="dw-btn-secondary" style={{ width: "100%" }}>
+            Discard {dirtyCount} override{dirtyCount === 1 ? "" : "s"}
+          </button>
+        ) : frameOverrideLocCount > 0 ? (
+          // No overrides on THIS element, but the frame has overrides on
+          // others — surface a "Discard all" so users can wipe the whole
+          // frame without hunting for an outlined element.
+          <button onClick={onDiscardAll} className="dw-btn-secondary" style={{ width: "100%" }}>
+            Discard all overrides ({frameOverrideLocCount})
+          </button>
+        ) : (
+          <button disabled className="dw-btn-secondary" style={{ width: "100%" }}>
+            Discard
+          </button>
+        )}
       </div>
     </div>
   );

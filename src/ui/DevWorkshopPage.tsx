@@ -652,7 +652,15 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
   // auto-resets when componentId changes.
   const componentId = selected?.id ?? "__none__";
   const canvas = useCanvasState(componentId, variantIndex);
-  const { undo: canvasUndo, redo: canvasRedo, applyOverride, clearOverridesForLoc, setSelection: setCanvasSelection, activeFrame } = canvas;
+  const {
+    undo: canvasUndo,
+    redo: canvasRedo,
+    applyOverride,
+    clearOverridesForLoc,
+    clearAllOverrides,
+    setSelection: setCanvasSelection,
+    activeFrame,
+  } = canvas;
 
   // Cmd+Z / Cmd+Shift+Z while Props tab is active → undo/redo args overrides.
   useEffect(() => {
@@ -740,6 +748,22 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
     if (!currentLoc) return;
     clearOverridesForLoc(activeFrame.id, currentLoc);
   }, [clearOverridesForLoc, activeFrame.id, currentLoc]);
+
+  // "Discard all overrides" fallback — count locs with at least one
+  // non-null prop, and provide a single-click clear for the whole frame
+  // when the inspector lands on an element that has nothing to discard
+  // locally but other elements in the frame do.
+  const frameOverrideLocCount = useMemo(() => {
+    let n = 0;
+    for (const styles of Object.values(activeFrame.overrides)) {
+      if (Object.keys(styles).filter((k) => styles[k] != null).length > 0) n += 1;
+    }
+    return n;
+  }, [activeFrame.overrides]);
+
+  const handleInspectorDiscardAll = useCallback(() => {
+    clearAllOverrides(activeFrame.id);
+  }, [clearAllOverrides, activeFrame.id]);
 
   // Auto-switch to Element tab when something is selected via canvas click
   useEffect(() => {
@@ -847,6 +871,8 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
             inspectorOverrides={inspectorOverrides}
             onInspectorChange={handleInspectorChange}
             onInspectorDiscard={handleInspectorDiscard}
+            onInspectorDiscardAll={handleInspectorDiscardAll}
+            frameOverrideLocCount={frameOverrideLocCount}
           />
         </div>
       </div>
