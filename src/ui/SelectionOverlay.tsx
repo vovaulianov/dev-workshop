@@ -15,14 +15,10 @@ interface Props {
    *  with the proposed new size in CSS pixels. Frame forwards it into the
    *  active frame's overrides as `width`/`height`. */
   onResize?: (next: { width: number; height: number }) => void;
-  /** Live body-drag callback: a `transform: translate(...)` string the
-   *  selected element should adopt while the user drags it. Frame writes
-   *  it into the active frame's overrides on each pointermove tick. */
-  onMove?: (transform: string) => void;
-  /** Drag-session bookends. Both resize and body drag fire onDragStart on
-   *  pointerdown and onDragEnd on pointerup so canvas state can coalesce
-   *  the gesture into one undo step (otherwise hundreds of pointermove
-   *  ticks each push a history entry and freeze the page). */
+  /** Drag-session bookends. Resize handles fire onDragStart on pointerdown
+   *  and onDragEnd on pointerup so canvas state can coalesce the gesture
+   *  into one undo step (otherwise hundreds of pointermove ticks each
+   *  push a history entry and freeze the page). */
   onDragStart?: () => void;
   onDragEnd?: () => void;
 }
@@ -79,7 +75,7 @@ function useRect(el: Element | null, stage: HTMLElement | null, tick: number) {
   return rect;
 }
 
-export function SelectionOverlay({ stage, hovered, selected, onResize, onMove, onDragStart, onDragEnd }: Props) {
+export function SelectionOverlay({ stage, hovered, selected, onResize, onDragStart, onDragEnd }: Props) {
   const [tick, setTick] = useState(0);
   useEffect(() => setTick((t) => t + 1), [hovered, selected]);
 
@@ -124,16 +120,6 @@ export function SelectionOverlay({ stage, hovered, selected, onResize, onMove, o
           }}
         />
       )}
-      {selectedRect && onMove && selected && (
-        <DragHandle
-          rect={selectedRect}
-          scale={safeScale}
-          selected={selected}
-          onMove={onMove}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-        />
-      )}
       {selectedRect && onResize && (
         <ResizeHandles
           rect={selectedRect}
@@ -144,90 +130,6 @@ export function SelectionOverlay({ stage, hovered, selected, onResize, onMove, o
         />
       )}
     </>
-  );
-}
-
-function DragHandle({
-  rect,
-  scale,
-  selected,
-  onMove,
-  onDragStart,
-  onDragEnd,
-}: {
-  rect: Rect;
-  scale: number;
-  selected: Element;
-  onMove: (transform: string) => void;
-  onDragStart?: () => void;
-  onDragEnd?: () => void;
-}) {
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const target = e.currentTarget;
-    target.setPointerCapture(e.pointerId);
-    onDragStart?.();
-
-    const startMouseX = e.clientX;
-    const startMouseY = e.clientY;
-    // Read existing transform translate so subsequent drags accumulate
-    // instead of resetting to 0,0 each time.
-    const computed = getComputedStyle(selected).transform;
-    let startTx = 0;
-    let startTy = 0;
-    if (computed && computed !== "none") {
-      try {
-        const m = new DOMMatrixReadOnly(computed);
-        startTx = m.m41;
-        startTy = m.m42;
-      } catch {
-        /* unparseable — start from 0 */
-      }
-    }
-
-    const onPointerMove = (ev: PointerEvent) => {
-      const dx = (ev.clientX - startMouseX) / scale;
-      const dy = (ev.clientY - startMouseY) / scale;
-      const newTx = startTx + dx;
-      const newTy = startTy + dy;
-      onMove(`translate(${newTx.toFixed(1)}px, ${newTy.toFixed(1)}px)`);
-    };
-    const onPointerUp = (ev: PointerEvent) => {
-      try {
-        target.releasePointerCapture(ev.pointerId);
-      } catch {
-        /* ignore */
-      }
-      target.removeEventListener("pointermove", onPointerMove);
-      target.removeEventListener("pointerup", onPointerUp);
-      target.removeEventListener("pointercancel", onPointerUp);
-      onDragEnd?.();
-    };
-    target.addEventListener("pointermove", onPointerMove);
-    target.addEventListener("pointerup", onPointerUp);
-    target.addEventListener("pointercancel", onPointerUp);
-  };
-
-  return (
-    <div
-      data-dw-drag="body"
-      onPointerDown={onPointerDown}
-      style={{
-        position: "absolute",
-        top: rect.top,
-        left: rect.left,
-        width: rect.width,
-        height: rect.height,
-        cursor: "move",
-        // Below resize handles (1010) so corners/edges still take priority
-        // for pointer events, above the outline (1000) and the user's
-        // component DOM so we capture the body drag.
-        zIndex: 1005,
-        background: "transparent",
-        touchAction: "none",
-      }}
-    />
   );
 }
 

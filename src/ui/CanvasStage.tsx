@@ -58,18 +58,11 @@ export function CanvasStage({ entry, argsOverride, canvas, width, onSelectElemen
     [applyOverride, state.activeFrameId, state.selection.sourceLoc],
   );
 
-  // Live body-drag callback. Writes `transform: translate(...)` so the
-  // element shifts visually without breaking parent layout (no absolute
-  // positioning required). Subsequent drags accumulate (DragHandle reads
-  // the current transform from getComputedStyle on each pointerdown).
-  const onMoveSelected = useCallback(
-    (transform: string) => {
-      const loc = state.selection.sourceLoc;
-      if (!loc) return;
-      applyOverride(state.activeFrameId, loc, "transform", transform);
-    },
-    [applyOverride, state.activeFrameId, state.selection.sourceLoc],
-  );
+  // Body drag-to-move was tried in Phase 2c but pulled — overriding
+  // `transform: translate(...)` clobbered any CSS transforms the user's
+  // component had (scale, rotate, etc.) and let elements visually exit
+  // their parent. Phase 3+ can revisit with proper auto-layout reordering
+  // or constrained absolute positioning.
 
   // Modifier-key tracking — for Distance layer (⌥) and Space-pan.
   useEffect(() => {
@@ -256,7 +249,6 @@ export function CanvasStage({ entry, argsOverride, canvas, width, onSelectElemen
               width={width}
               onActivate={() => setActiveFrame(f.id)}
               onResizeSelected={onResizeSelected}
-              onMoveSelected={onMoveSelected}
               onDragStart={beginTransaction}
               onDragEnd={commitTransaction}
             />

@@ -36,10 +36,6 @@ interface Props {
   /** Live resize callback fired during a handle drag. CanvasStage routes
    *  this into the active frame's overrides as `width`/`height`. */
   onResizeSelected?: (next: { width: number; height: number }) => void;
-  /** Live body-drag callback fired during a translate gesture. CanvasStage
-   *  routes the resulting transform string into the active frame's
-   *  overrides as `transform`. */
-  onMoveSelected?: (transform: string) => void;
   /** Drag-session bookends. SelectionOverlay calls onDragStart on
    *  pointerdown and onDragEnd on pointerup so canvas-state coalesces
    *  the gesture into a single undo step. */
@@ -64,7 +60,6 @@ export function Frame({
   width,
   onActivate,
   onResizeSelected,
-  onMoveSelected,
   onDragStart,
   onDragEnd,
 }: Props) {
@@ -248,7 +243,6 @@ export function Frame({
             hovered={hovered && hovered !== selectedElement ? hovered : null}
             selected={selectedElement}
             onResize={selectedElement ? onResizeSelected : undefined}
-            onMove={selectedElement ? onMoveSelected : undefined}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
           />

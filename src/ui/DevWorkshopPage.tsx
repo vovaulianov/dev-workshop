@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, startTransition } from "react";
 import { ComponentSidebar } from "./ComponentSidebar";
 import { ComponentPreview } from "./ComponentPreview";
 import type { SelectedElement } from "./ComponentPreview";
@@ -699,9 +699,10 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
         return;
       }
 
-      // Cmd+D — duplicate active frame. We pass the layout width
-      // (numeric or 430 fallback for "full") so the new frame is offset
-      // far enough not to overlap.
+      // Cmd+D — duplicate active frame. Wrapped in startTransition so the
+      // heavy mount of the new frame's full React tree (~hundred-ms range
+      // for non-trivial stories) yields to user interaction; the keypress
+      // returns immediately while React mounts in the background.
       if (
         (e.metaKey || e.ctrlKey) &&
         !e.shiftKey &&
@@ -710,7 +711,25 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
         !inField
       ) {
         e.preventDefault();
-        canvasAddFrame(activeFrame.id);
+        startTransition(() => {
+          canvasAddFrame(activeFrame.id);
+        });
+        return;
+      }
+
+      // Cmd+C / Cmd+V are reserved for Phase 3 (sketchbook copy/paste).
+      // For now we swallow them on the Element tab so the browser
+      // default (copy-selected-text / paste-into-focused-input) doesn't
+      // interfere with the canvas — pressing them is a no-op until
+      // sketchbook-aware copy/paste lands.
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        !inField &&
+        (e.key === "c" || e.key === "C" || e.key === "v" || e.key === "V") &&
+        !e.shiftKey &&
+        !e.altKey
+      ) {
+        e.preventDefault();
         return;
       }
 
@@ -722,7 +741,7 @@ export default function DevWorkshopPage({ tokensCssFile = "src/index.css" }: Dev
         if (selectedEl) return;
         if (canvas.state.frames.length <= 1) return;
         e.preventDefault();
-        canvasRemoveFrame(activeFrame.id);
+        startTransition(() => canvasRemoveFrame(activeFrame.id));
         return;
       }
     };
